@@ -21,6 +21,7 @@
   .app{display:flex;height:100vh}
   /* 侧栏 */
   .side{width:300px;min-width:300px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 10px}
+  .brand{width:100%;height:auto;display:block;margin:2px 0 8px;border-radius:10px;background:var(--chip);padding:8px}
   .side h1{font-size:17px;margin:6px 8px 4px;color:var(--brand)}
   .side .sub{font-size:12px;color:var(--muted);margin:0 8px 12px}
   .grp{margin:10px 4px;font-size:13px;font-weight:700;color:var(--brand2);letter-spacing:.5px}
@@ -82,13 +83,24 @@
   .topbar button{font-size:13px;padding:6px 12px;border:1px solid var(--line);background:var(--chip);border-radius:8px;cursor:pointer;color:var(--ink)}
   @media (max-width:760px){.side{position:fixed;z-index:20;height:100%;transform:translateX(-100%);transition:.2s}
     .side.open{transform:none}.main{padding:18px}}
+  /* 校本便签（全局悬浮） */
+  .note-fab{position:fixed;right:18px;bottom:18px;z-index:60;font-family:inherit}
+  .note-fab-btn{width:54px;height:54px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+  .note-panel{position:absolute;right:0;bottom:66px;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.2);padding:12px;display:flex;flex-direction:column;gap:8px}
+  .note-head{font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .note-mini{font-size:12px;padding:3px 9px;border:1px solid var(--line);background:var(--chip);border-radius:7px;cursor:pointer;color:var(--ink)}
+  #noteArea{width:100%;height:150px;resize:vertical;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-size:14px;font-family:inherit;line-height:1.6}
+  .note-foot{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .note-saved{color:var(--ok);font-weight:600}
+  @media (max-width:760px){.note-panel{width:calc(100vw - 36px)}}
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="side" id="side">
+    <img class="brand" src="school-badge-display.png" alt="河北峰峰第一中学校徽">
     <h1>🎵 音乐鉴赏 · 互动课堂</h1>
-    <div class="sub">人音版 必修《音乐鉴赏》2019</div>
+    <div class="sub">河北峰峰第一中学 · 人音版必修《音乐鉴赏》2019</div>
     <div class="tools">
       <button onclick="showView('home')">🏠 总览</button>
       <button onclick="showView('gloss')">🔤 术语速查</button>
@@ -108,6 +120,16 @@
     </div>
   </main>
 </div>
+
+  <!-- 校本便签 -->
+  <div class="note-fab">
+    <div id="notePanel" class="note-panel hidden">
+      <div class="note-head"><span>📝 课堂便签</span><button id="noteClear" class="note-mini">清空</button></div>
+      <textarea id="noteArea" placeholder="上课随手记：本校补充、重点提醒、学生表现……（仅保存在本机浏览器）"></textarea>
+      <div class="note-foot"><span id="noteSaved"></span><span>自动保存</span></div>
+    </div>
+    <button id="noteToggle" class="note-fab-btn" title="课堂便签">📝</button>
+  </div>
 
 <script src="data.js"></script>
 <script>
@@ -230,9 +252,9 @@ function updateScore(){
 }
 
 function showView(v){
-  if(v==="home"){ crumb.textContent="总览"; 
+  if(v==="home"){ crumb.textContent="总览";
     $("#content").innerHTML = `<div class="uhead"><h2>欢迎使用《音乐鉴赏》互动课堂</h2></div>
-      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念。</div>
+      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念。右下角 📝 便签可随手记录校本补充。</div>
       <div class="card"><h3>📚 全书结构</h3><ul class="clean">
       ${D.units.map(u=>`<li><a href="#" onclick="showUnit('${u.id}')" style="color:var(--brand2)">${esc(u.title.replace(/（.*$/,'') )}</a></li>`).join("")}
       </ul></div>`;
@@ -260,6 +282,25 @@ function closeSide(){ if(window.innerWidth<=760) $("#side").classList.remove("op
 function setTheme(t){ document.documentElement.dataset.theme=t; localStorage.setItem("ma-theme",t);
   $("#themeBtn").textContent = t==="dark"?"☀️ 切换浅色":"🌓 切换深色"; }
 $("#themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+
+// 校本便签（全局悬浮，仅存本机浏览器）
+const NOTE_KEY="fyz_note_v1";
+const noteArea=$("#noteArea"), notePanel=$("#notePanel"), noteSaved=$("#noteSaved");
+noteArea.value=localStorage.getItem(NOTE_KEY)||"";
+let noteTimer=null;
+noteArea.addEventListener("input",()=>{
+  clearTimeout(noteTimer);
+  noteTimer=setTimeout(()=>{
+    localStorage.setItem(NOTE_KEY,noteArea.value);
+    noteSaved.textContent="已保存 ✓";
+    setTimeout(()=>noteSaved.textContent="",1500);
+  },400);
+});
+$("#noteToggle").onclick=()=>notePanel.classList.toggle("hidden");
+$("#noteClear").onclick=()=>{
+  if(noteArea.value && !confirm("确定清空便签内容？")) return;
+  noteArea.value=""; localStorage.removeItem(NOTE_KEY); noteSaved.textContent="已清空";
+};
 
 // init
 buildNav();
