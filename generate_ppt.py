@@ -9,7 +9,8 @@ import os, re, json, glob
 
 ROOT = "/Users/lt/WorkBuddy/2026-09-21-01-46-33/music-appreciation-web"
 SKILL = "/Users/lt/.workbuddy/skills/music-appreciation"
-BADGE = os.path.join(ROOT, "school-badge-display.png")
+LOGO = os.path.join(ROOT, "school-logo.png")
+NAMEIMG = os.path.join(ROOT, "school-name.png")
 OUT = os.path.join(ROOT, "ppt")
 os.makedirs(OUT, exist_ok=True)
 
@@ -277,8 +278,10 @@ def build_ppt(ch, sec_idx, quiz):
     p3 = tb3.text_frame.paragraphs[0]
     style_run(p3.add_run(), 15, MUTED)
     p3.runs[0].text = f"河北峰峰第一中学 · 音乐鉴赏（人音版必修 2019）· {ch['group']}"
-    if os.path.exists(BADGE):
-        s.shapes.add_picture(BADGE, Inches(11.3), Inches(0.5), width=Inches(1.5))
+    if os.path.exists(LOGO):
+        s.shapes.add_picture(LOGO, Inches(11.5), Inches(0.45), width=Inches(1.15))
+    if os.path.exists(NAMEIMG):
+        s.shapes.add_picture(NAMEIMG, Inches(0.7), Inches(4.7), width=Inches(3.0))
 
     # 2. 学习目标 / Core Idea
     s = slide_blank(prs); header(s, "学习目标", "本课要带学生走到哪里")
