@@ -25,6 +25,13 @@
 - `generate_data.py` — 从 `~/.workbuddy/skills/music-appreciation/` 解析生成 `data.js`
 - `school-badge.png` — 校徽原图（淡金 #FFFD9B，用户提供的源文件，保留备用）
 - `school-badge-display.png` — 页面使用的校徽显示版（单色重着色为深金 #C9A227，投影更清晰）
+- `generate_ppt.py` — 由章节自动生成每节 PPT 课件（python-pptx），运行 `python3 generate_ppt.py` 输出到 `./ppt`
+- `ppt/` — **每节一份上课用 PPT 课件（共 35 份）**，板块：封面·学习目标·核心框架/概念·易错提醒·作品鉴赏·变易教学设计（审辨焦点 + 对比/类合/区分/融合 四图式）·随堂练习·配套资源
+
+### PPT 课件说明
+- 与网页电子课本联动：PPT 里的「随堂练习」题目取自 `data.js`，「作品鉴赏」取自各单元曲目表，「变易教学设计」按变易理论（审辨 + 四变易图式）为每单元新写，结合该单元真实作品与概念。
+- 课件封面已置入河北峰峰第一中学校徽与校名，投影即见学校标识。
+- 重新生成：`/Users/lt/.workbuddy/binaries/python/envs/default/bin/python generate_ppt.py`（需 `pip install python-pptx`）。
 
 ### 校徽颜色说明
 原校徽为单色淡金 logo（#FFFD9B），在浅色背景上对比度低、投影几乎不可见。因公开渠道未查到学校官方标准色，页面改用同色系加深的金 #C9A227 显示版（浅/深色主题均清晰）。
