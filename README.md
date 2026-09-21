@@ -24,8 +24,9 @@
 - `index.html` — 网页主体（自包含）
 - `data.js` — 由章节自动生成的结构化数据（含练习题），运行 `generate_data.py` 可重新生成
 - `generate_data.py` — 从 `~/.workbuddy/skills/music-appreciation/` 解析生成 `data.js`
-- `school-badge.png` — 校徽原图（淡金 #FFFD9B，用户提供的源文件，保留备用）
-- `school-badge-display.png` — 页面使用的校徽显示版（单色重着色为深金 #C9A227，投影更清晰）
+- `school-logo.png` — 学校官方校徽（彩色 logo，140×140，白底；页面置于白色圆角品牌牌中显示）
+- `school-name.png` — 学校官方校名标（河北峰峰第一中学 + 英文名，356×96，白底）
+- `school-badge.png` / `school-badge-display.png` — 早期使用的单色金色字标（已被上方官方校徽+校名替换，保留备用）
 - `generate_ppt.py` — 由章节自动生成每节 PPT 课件（python-pptx），运行 `python3 generate_ppt.py` 输出到 `./ppt`
 - `ppt/` — **每节一份上课用 PPT 课件（共 35 份）**，板块：封面·学习目标·核心框架/概念·易错提醒·作品鉴赏·变易教学设计（审辨焦点 + 对比/类合/区分/融合 四图式）·随堂练习·配套资源
 
@@ -34,6 +35,5 @@
 - 课件封面已置入河北峰峰第一中学校徽与校名，投影即见学校标识。
 - 重新生成：`/Users/lt/.workbuddy/binaries/python/envs/default/bin/python generate_ppt.py`（需 `pip install python-pptx`）。
 
-### 校徽颜色说明
-原校徽为单色淡金 logo（#FFFD9B），在浅色背景上对比度低、投影几乎不可见。因公开渠道未查到学校官方标准色，页面改用同色系加深的金 #C9A227 显示版（浅/深色主题均清晰）。
-如需改回原色或换成学校官方色，把目标色 hex 告诉制作者，单色图可一键整体重着色替换 `school-badge-display.png`。
+### 校徽 / 校名说明
+侧栏品牌区使用学校官方「校徽 + 校名」图（2026-09 由用户提供）。两张原图均为白底，页面将其放在白色圆角品牌牌中展示，深浅主题下都协调。早期单色金色字标（#FFFD9B / 加深 #C9A227）已弃用，文件保留备用。

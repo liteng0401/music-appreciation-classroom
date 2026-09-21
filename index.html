@@ -21,7 +21,9 @@
   .app{display:flex;height:100vh}
   /* 侧栏 */
   .side{width:300px;min-width:300px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 10px}
-  .brand{width:100%;height:auto;display:block;margin:2px 0 8px;border-radius:10px;background:var(--chip);padding:8px}
+  .brand{display:flex;flex-direction:column;align-items:center;gap:7px;background:#fff;border-radius:10px;padding:12px 10px 10px;margin:2px 0 8px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .brand-logo{width:64px;height:auto;display:block}
+  .brand-name{width:100%;max-width:200px;height:auto;display:block}
   .side h1{font-size:17px;margin:6px 8px 4px;color:var(--brand)}
   .side .sub{font-size:12px;color:var(--muted);margin:0 8px 12px}
   .grp{margin:10px 4px;font-size:13px;font-weight:700;color:var(--brand2);letter-spacing:.5px}
@@ -98,9 +100,12 @@
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <img class="brand" src="school-badge-display.png" alt="河北峰峰第一中学校徽">
+    <div class="brand">
+      <img class="brand-logo" src="school-logo.png" alt="河北峰峰第一中学校徽">
+      <img class="brand-name" src="school-name.png" alt="河北峰峰第一中学校名">
+    </div>
     <h1>🎵 音乐鉴赏 · 互动课堂</h1>
-    <div class="sub">河北峰峰第一中学 · 人音版必修《音乐鉴赏》2019</div>
+    <div class="sub">人音版必修《音乐鉴赏》2019 · 课堂教学</div>
     <div class="tools">
       <button onclick="showView('home')">🏠 总览</button>
       <button onclick="showView('gloss')">🔤 术语速查</button>
