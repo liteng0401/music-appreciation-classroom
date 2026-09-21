@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高中音乐鉴赏 · 互动课堂</title>
+<style>
+  :root{
+    --bg:#f4f1ea; --panel:#ffffff; --ink:#23303a; --muted:#6b7780; --line:#e3ddd0;
+    --brand:#c0392b; --brand2:#16638a; --accent:#f0b429; --ok:#2e8b57; --bad:#c0392b;
+    --chip:#eef2f4;
+  }
+  [data-theme="dark"]{
+    --bg:#1b1f24; --panel:#252b31; --ink:#e8edf1; --muted:#9aa6ad; --line:#39424a;
+    --brand:#e35b4c; --brand2:#4aa3cf; --accent:#f0b429; --ok:#56c08a; --bad:#e35b4c;
+    --chip:#2e353c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7}
+  .app{display:flex;height:100vh}
+  /* 侧栏 */
+  .side{width:300px;min-width:300px;background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 10px}
+  .side h1{font-size:17px;margin:6px 8px 4px;color:var(--brand)}
+  .side .sub{font-size:12px;color:var(--muted);margin:0 8px 12px}
+  .grp{margin:10px 4px;font-size:13px;font-weight:700;color:var(--brand2);letter-spacing:.5px}
+  .navbtn{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--ink);
+    padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;margin:2px 0;line-height:1.35}
+  .navbtn:hover{background:var(--chip)}
+  .navbtn.active{background:var(--brand);color:#fff}
+  .navbtn .tag{font-size:11px;opacity:.7;display:block}
+  .tools{margin:14px 8px 4px;display:flex;gap:8px;flex-wrap:wrap}
+  .tools button{font-size:12px;padding:6px 10px;border:1px solid var(--line);background:var(--chip);border-radius:8px;cursor:pointer;color:var(--ink)}
+  /* 主区 */
+  .main{flex:1;overflow:auto;padding:26px 40px 80px}
+  .wrap{max-width:920px;margin:0 auto}
+  .uhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:3px solid var(--brand);padding-bottom:10px;margin-bottom:18px}
+  .uhead h2{margin:0;font-size:24px}
+  .uhead .grp-l{font-size:13px;color:var(--brand2);background:var(--chip);padding:2px 10px;border-radius:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card h3{margin:0 0 10px;font-size:18px;color:var(--brand2);display:flex;align-items:center;gap:8px}
+  .card h3::before{content:"";width:6px;height:18px;background:var(--accent);border-radius:3px;display:inline-block}
+  .core{background:linear-gradient(135deg,#fff7ec,#fff);border-left:5px solid var(--accent);font-size:16px}
+  .term{margin:10px 0;padding:10px 14px;background:var(--chip);border-radius:10px}
+  .term b{color:var(--brand)}
+  .term .d{display:block;margin-top:3px;color:var(--ink)}
+  .term .dt{display:block;margin-top:5px;font-size:13px;color:var(--muted)}
+  ul.clean{margin:6px 0;padding-left:20px}
+  ul.clean li{margin:5px 0}
+  .works{display:grid;grid-template-columns:1fr;gap:8px}
+  .work{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--chip)}
+  .work .n{font-weight:700}
+  .work .a{font-size:13px;color:var(--muted)}
+  /* 测验 */
+  .quiz .q{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .q .qt{font-weight:600;margin-bottom:10px}
+  .opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer;color:var(--ink);font-size:15px}
+  .opt:hover{border-color:var(--brand2)}
+  .opt.sel{border-color:var(--brand);background:#fff1ee}
+  .opt.right{background:#e8f6ee;border-color:var(--ok)}
+  .opt.wrong{background:#fce9e7;border-color:var(--bad)}
+  .q .ex{margin-top:10px;padding:10px 12px;background:var(--chip);border-radius:9px;font-size:14px;display:none}
+  .q .ex.show{display:block}
+  .qbtns{margin-top:8px;display:flex;gap:10px}
+  .qbtns button{font-size:13px;padding:7px 14px;border:0;border-radius:8px;cursor:pointer}
+  .submit{background:var(--brand);color:#fff}
+  .next{background:var(--brand2);color:#fff;display:none}
+  .score{font-size:15px;font-weight:700;color:var(--brand2);margin:10px 0}
+  .progress{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:8px 0 4px}
+  .progress > i{display:block;height:100%;width:0;background:var(--brand);transition:width .3s}
+  /* 速查 */
+  .gloss{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .gloss .g{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--panel)}
+  .gloss .g b{color:var(--brand)}
+  .search{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-size:15px;margin-bottom:12px}
+  .note{color:var(--muted);font-size:13px;background:var(--chip);padding:8px 12px;border-radius:8px}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--chip)}
+  .hidden{display:none}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .topbar button{font-size:13px;padding:6px 12px;border:1px solid var(--line);background:var(--chip);border-radius:8px;cursor:pointer;color:var(--ink)}
+  @media (max-width:760px){.side{position:fixed;z-index:20;height:100%;transform:translateX(-100%);transition:.2s}
+    .side.open{transform:none}.main{padding:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <h1>🎵 音乐鉴赏 · 互动课堂</h1>
+    <div class="sub">人音版 必修《音乐鉴赏》2019</div>
+    <div class="tools">
+      <button onclick="showView('home')">🏠 总览</button>
+      <button onclick="showView('gloss')">🔤 术语速查</button>
+      <button onclick="showView('cheat')">📊 对比速查</button>
+    </div>
+    <div id="nav"></div>
+    <div class="tools"><button id="themeBtn">🌓 切换深色</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="wrap">
+      <div class="topbar">
+        <div id="crumb" style="color:var(--muted);font-size:13px"></div>
+        <button onclick="toggleSide()">☰ 目录</button>
+      </div>
+      <div id="content"></div>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.COURSE_DATA;
+const $ = (s,el=document)=>el.querySelector(s);
+const crumb = $("#crumb");
+
+function groupName(g){return g==="序篇"?"序篇":g;}
+
+function buildNav(){
+  const nav = $("#nav");
+  const order = ["序篇","上篇","下篇"];
+  const seq = {"序篇":[],"上篇":[],"下篇":[]};
+  D.units.forEach(u=>seq[u.group].push(u));
+  order.forEach(g=>{
+    if(!seq[g].length) return;
+    const h=document.createElement("div");
+    h.className="grp"; h.textContent = g==="序篇"?"序篇":(g==="上篇"?"上篇（第一—八单元）":"下篇（第九—十八单元）");
+    nav.appendChild(h);
+    seq[g].forEach(u=>{
+      const b=document.createElement("button");
+      b.className="navbtn"; b.dataset.id=u.id;
+      b.innerHTML = u.title.replace(/（.*$/,'') + `<span class="tag">${u.id.toUpperCase()}</span>`;
+      b.onclick=()=>{showUnit(u.id); closeSide();};
+      nav.appendChild(b);
+    });
+  });
+}
+
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function termCard(t){
+  return `<div class="term"><b>${esc(t.term)}</b><span class="d">${esc(t.def)}</span>${t.detail?`<span class="dt">${esc(t.detail).replace(/\n/g,'<br>')}</span>`:''}</div>`;
+}
+
+function showUnit(id){
+  const u = D.units.find(x=>x.id===id);
+  crumb.textContent = `${u.group} › ${u.title.replace(/（.*$/,'')}`;
+  let h = `<div class="uhead"><span class="grp-l">${u.group}</span><h2>${esc(u.title)}</h2></div>`;
+  h += `<div class="card core"><h3>本节要点</h3>${esc(u.core)||"（见正文）"}</div>`;
+
+  if(u.frameworks.length){
+    h += `<div class="card"><h3>📐 核心框架 / 概念</h3>${u.frameworks.map(termCard).join("")}</div>`;
+  }
+  if(u.concepts.length){
+    h += `<div class="card"><h3>🔑 关键术语</h3>${u.concepts.map(termCard).join("")}</div>`;
+  }
+  if(u.mental.length){
+    h += `<div class="card"><h3>🧠 鉴赏思路</h3><ul class="clean">${u.mental.map(m=>`<li>${esc(m)}</li>`).join("")}</ul></div>`;
+  }
+  if(u.works.length){
+    h += `<div class="card"><h3>🎼 本课作品鉴赏</h3><div class="works">${u.works.map(w=>`<div class="work"><div class="n">《${esc(w.name.replace(/[《》]/g,''))}》</div><div class="a">${esc(w.author||'')}${w.genre?' · '+esc(w.genre):''}</div></div>`).join("")}</div></div>`;
+  }
+  if(u.worked){
+    h += `<div class="card"><h3>🎯 聆听示范</h3><div style="white-space:pre-wrap;font-size:14px">${esc(u.worked)}</div></div>`;
+  }
+  if(u.takeaways.length){
+    h += `<div class="card"><h3>✅ 学习要点</h3><ol class="clean">${u.takeaways.map(t=>`<li>${esc(t)}</li>`).join("")}</ol></div>`;
+  }
+  // 测验
+  h += `<div class="card quiz"><h3>✏️ 随堂练习（${u.quiz.length} 题）</h3>
+        <div class="progress"><i id="bar"></i></div>
+        <div class="score" id="score">已完成 0 / ${u.quiz.length}</div>
+        <div id="qlist"></div>
+        <div id="quizDone" class="hidden" style="margin-top:10px;font-weight:700;color:var(--brand2)"></div>
+        </div>`;
+  $("#content").innerHTML = h;
+  renderQuiz(u);
+  window.scrollTo(0,0);
+}
+
+function renderQuiz(u){
+  const box = $("#qlist"); box.innerHTML=""; answered=new Set();
+  u.quiz.forEach((q,i)=>{
+    const qd=document.createElement("div"); qd.className="q"; qd.dataset.i=i;
+    let opts = q.options.map((o,j)=>`<button class="opt" data-j="${j}" onclick="sel(${i},${j})">${esc(o)}</button>`).join("");
+    qd.innerHTML = `<div class="qt">${i+1}. ${esc(q.q)}</div>${opts}
+      <div class="ex" id="ex${i}">💡 ${esc(q.explain)}</div>
+      <div class="qbtns"><button class="submit" onclick="grade(${i},${q.answer})">提交</button>
+      <button class="next" onclick="nextQ(${i})">下一题 ↓</button></div>`;
+    box.appendChild(qd);
+  });
+}
+
+let answered=new Set();
+function sel(i,j){
+  const qd=$(`#qlist .q[data-i="${i}"]`);
+  qd.querySelectorAll(".opt").forEach(o=>o.classList.remove("sel"));
+  qd.querySelector(`.opt[data-j="${j}"]`).classList.add("sel");
+}
+function grade(i,ans){
+  if(answered.has(i)) return;
+  const qd = $(`#qlist .q[data-i="${i}"]`);
+  const opts=[...qd.querySelectorAll(".opt")];
+  opts.forEach(o=>{
+    o.onclick=null;
+    const j=+o.dataset.j;
+    if(j===ans) o.classList.add("right");
+    else if(o.classList.contains("sel")) o.classList.add("wrong");
+  });
+  $("#ex"+i).classList.add("show");
+  $(".next",qd).style.display="inline-block";
+  answered.add(i);
+  updateScore();
+}
+function nextQ(i){
+  const n=$(`#qlist .q[data-i="${i+1}"]`);
+  if(n) n.scrollIntoView({behavior:"smooth",block:"center"});
+}
+function updateScore(){
+  const cur = [...document.querySelectorAll("#qlist .q")].length;
+  const done = answered.size;
+  $("#score").textContent = `已完成 ${done} / ${cur}`;
+  $("#bar").style.width = cur? (done/cur*100)+"%" : "0";
+  if(cur && done===cur){
+    const rights=[...document.querySelectorAll("#qlist .opt.right")].length;
+    $("#quizDone").classList.remove("hidden");
+    $("#quizDone").textContent = `🎉 本单元练习完成！正确 ${rights} / ${cur}（绿色为正确项，红色为你的误选）`;
+  }
+}
+
+function showView(v){
+  if(v==="home"){ crumb.textContent="总览"; 
+    $("#content").innerHTML = `<div class="uhead"><h2>欢迎使用《音乐鉴赏》互动课堂</h2></div>
+      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念。</div>
+      <div class="card"><h3>📚 全书结构</h3><ul class="clean">
+      ${D.units.map(u=>`<li><a href="#" onclick="showUnit('${u.id}')" style="color:var(--brand2)">${esc(u.title.replace(/（.*$/,'') )}</a></li>`).join("")}
+      </ul></div>`;
+    return;
+  }
+  if(v==="gloss"){
+    crumb.textContent="术语速查";
+    let h=`<div class="card"><h3>🔤 全书术语速查（${D.glossary.length}）</h3>
+      <input class="search" id="gsearch" placeholder="搜索术语，如：京剧 / 奏鸣曲式 / 山歌">
+      <div class="gloss" id="glist"></div></div>`;
+    $("#content").innerHTML=h;
+    const render=(kw)=>{$("#glist").innerHTML=D.glossary.filter(g=>!kw||g.term.includes(kw)||g.def.includes(kw))
+      .map(g=>`<div class="g"><b>${esc(g.term)}</b> — ${esc(g.def)}</div>`).join("")};
+    render(""); $("#gsearch").oninput=e=>render(e.target.value.trim());
+    return;
+  }
+  if(v==="cheat"){
+    crumb.textContent="对比速查";
+    $("#content").innerHTML=`<div class="card"><h3>📊 对比速查表</h3>${D.cheatsheet}</div>`;
+  }
+}
+
+function toggleSide(){ $("#side").classList.toggle("open"); }
+function closeSide(){ if(window.innerWidth<=760) $("#side").classList.remove("open"); }
+function setTheme(t){ document.documentElement.dataset.theme=t; localStorage.setItem("ma-theme",t);
+  $("#themeBtn").textContent = t==="dark"?"☀️ 切换浅色":"🌓 切换深色"; }
+$("#themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+
+// init
+buildNav();
+setTheme(localStorage.getItem("ma-theme")||"light");
+showView("home");
+</script>
+</body>
+</html>

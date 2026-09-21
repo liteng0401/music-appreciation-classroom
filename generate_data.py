@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""从 music-appreciation skill 的章节/术语/速查表解析出网页数据 data.js。"""
+import os, re, json, random
+
+SKILL = "/Users/lt/.workbuddy/skills/music-appreciation"
+OUT = "/Users/lt/WorkBuddy/2026-09-21-01-46-33/music-appreciation-web/data.js"
+
+GROUP_BY_PREFIX = {
+    "ch00": "序篇",
+    "ch01": "上篇", "ch02": "上篇", "ch03": "上篇", "ch04": "上篇",
+    "ch05": "上篇", "ch06": "上篇", "ch07": "上篇", "ch08": "上篇",
+    "ch09": "下篇", "ch10": "下篇", "ch11": "下篇", "ch12": "下篇",
+    "ch13": "下篇", "ch14": "下篇", "ch15": "下篇", "ch16": "下篇",
+    "ch17": "下篇", "ch18": "下篇",
+}
+
+def read(p):
+    return open(p, encoding="utf-8").read()
+
+def parse_section(blocks, header):
+    return blocks.get(header, "")
+
+def split_sections(md):
+    """返回 {header: body} 按 '## ' 切分；保留 '# ' 作为 title。"""
+    lines = md.splitlines()
+    title = ""
+    cur = None
+    blocks = {}
+    buf = []
+    for ln in lines:
+        if ln.startswith("# ") and not title:
+            title = ln[2:].strip()
+            continue
+        if ln.startswith("## "):
+            if cur is not None:
+                blocks[cur] = "\n".join(buf).strip()
+            cur = ln[3:].strip()
+            buf = []
+        else:
+            buf.append(ln)
+    if cur is not None:
+        blocks[cur] = "\n".join(buf).strip()
+    return title, blocks
+
+def parse_term_bullets(body):
+    """解析 '- **术语**：定义' 及其续行/子项。返回 [(term, def, detail)]。"""
+    items = []
+    term = None; defin = ""; detail = []
+    for ln in body.splitlines():
+        m = re.match(r'^- \*\*(.+?)\*\*[\s：:—-]*(.*)$', ln)
+        if m:
+            if term is not None:
+                items.append((term, defin.strip(), "\n".join(detail).strip()))
+            term = m.group(1).strip()
+            defin = m.group(2).strip()
+            detail = []
+        elif ln.strip().startswith("- ") and term is not None:
+            detail.append(ln.strip()[2:].strip())
+        elif term is not None and ln.strip():
+            # 续行（非 bullet）
+            if not defin:
+                defin = ln.strip()
+            else:
+                detail.append(ln.strip())
+    if term is not None:
+        items.append((term, defin.strip(), "\n".join(detail).strip()))
+    return items
+
+def parse_simple_bullets(body):
+    out = []
+    for ln in body.splitlines():
+        s = ln.strip()
+        if s.startswith("- "):
+            out.append(s[2:].strip())
+        elif re.match(r'^\d+\.\s', s):
+            out.append(re.sub(r'^\d+\.\s', '', s))
+    return out
+
+def parse_table(body):
+    rows = []
+    for ln in body.splitlines():
+        s = ln.strip()
+        if not s.startswith("|"):
+            continue
+        if re.match(r'^\|[\s\-:|]+\|$', s):
+            continue  # separator
+        cells = [c.strip() for c in s.strip("|").split("|")]
+        rows.append(cells)
+    return rows
+
+def parse_works(body):
+    """从作品鉴赏表格提取 (曲名, 作者/来源, 体裁)。"""
+    works = []
+    for cells in parse_table(body):
+        # 去掉空 cell
+        cs = [c for c in cells if c]
+        if len(cs) < 2:
+            continue
+        # 跳过表头
+        if cs[0] in ("节", "曲名", "书名") or (len(cs) >= 2 and cs[1] in ("作者/来源", "作者·来源")):
+            continue
+        # 判断哪格是曲名：含《》或较短且不含'词/曲/民歌'
+        name = cs[0]
+        rest = cs[1:]
+        author = rest[0] if rest else ""
+        genre = rest[1] if len(rest) > 1 else ""
+        # 若第一格像"第一节"标签，则曲名取第二格
+        if re.match(r'^第[一二三四五六七八九十]+节', name):
+            if len(cs) >= 3:
+                name = cs[1]; author = cs[2]; genre = cs[3] if len(cs) > 3 else ""
+            else:
+                continue
+        if not name:
+            continue
+        works.append({"name": name, "author": author, "genre": genre})
+    return works
+
+# ---------- 解析各章 ----------
+units = []
+all_defs = []  # (term, def) 全局池，用于干扰项
+chapter_files = sorted(os.listdir(os.path.join(SKILL, "chapters")))
+for fn in chapter_files:
+    if not fn.endswith(".md"):
+        continue
+    prefix = fn.split("-")[0]
+    md = read(os.path.join(SKILL, "chapters", fn))
+    title, blocks = split_sections(md)
+    group = GROUP_BY_PREFIX.get(prefix, "上篇")
+    frameworks = parse_term_bullets(blocks.get("Frameworks Introduced", ""))
+    concepts = parse_term_bullets(blocks.get("Key Concepts", ""))
+    mental = parse_simple_bullets(blocks.get("Mental Models", ""))
+    anti = parse_term_bullets(blocks.get("Anti-patterns", ""))  # (mistake, why)
+    takeaways = parse_simple_bullets(blocks.get("Key Takeaways", ""))
+    worked = blocks.get("Worked Example", "")
+    core = blocks.get("Core Idea", "")
+    works = parse_works(blocks.get("作品鉴赏（第一单元全部曲目）", "") or blocks.get("作品鉴赏", "") or "")
+    # 作品鉴赏 表头可能在 "## 作品鉴赏" 段落；上面 key 可能为 '作品鉴赏' 或带括号
+    if not works:
+        for k, v in blocks.items():
+            if k.startswith("作品鉴赏"):
+                works = parse_works(v)
+                break
+
+    concept_pool = frameworks + concepts
+    for t, d, _ in concept_pool:
+        all_defs.append((t, d))
+
+    units.append({
+        "id": prefix,
+        "title": title,
+        "group": group,
+        "core": core,
+        "frameworks": [{"term": t, "def": d, "detail": dt} for t, d, dt in frameworks],
+        "concepts": [{"term": t, "def": d} for t, d, _ in concepts],
+        "mental": mental,
+        "anti": [{"mistake": t, "why": d} for t, d, _ in anti],
+        "worked": worked,
+        "takeaways": takeaways,
+        "works": works,
+    })
+
+# ---------- 生成练习题 ----------
+random.seed(20260921)
+def make_def_quiz(unit, n=6):
+    pool = [(f["term"], f["def"]) for f in unit["frameworks"]] + [(c["term"], c["def"]) for c in unit["concepts"]]
+    if len(pool) < 2:
+        return []
+    chosen = random.sample(pool, min(n, len(pool)))
+    qs = []
+    for term, correct in chosen:
+        distract = [d for t, d in pool if d != correct]
+        random.shuffle(distract)
+        opts = [correct] + distract[:3]
+        random.shuffle(opts)
+        qs.append({
+            "type": "choice",
+            "q": f"下列关于「{term}」的表述，正确的是？",
+            "options": opts,
+            "answer": opts.index(correct),
+            "explain": correct,
+        })
+    return qs
+
+def make_work_quiz(unit, n=3):
+    qs = []
+    works = [w for w in unit["works"] if w["author"]]
+    for w in works[:n]:
+        # 作者题
+        pool_auth = [x["author"] for x in unit["works"] if x["author"] and x["author"] != w["author"]]
+        if len(pool_auth) >= 1:
+            opts = [w["author"]] + random.sample(pool_auth, min(3, len(pool_auth)))
+            random.shuffle(opts)
+            qs.append({
+                "type": "choice",
+                "q": f"《{w['name'].strip('《》')}》的作曲/来源是？",
+                "options": opts,
+                "answer": opts.index(w["author"]),
+                "explain": f"《{w['name'].strip('《》')}》— {w['author']}" + (f"，体裁：{w['genre']}" if w["genre"] else ""),
+            })
+    return qs
+
+def make_judge_quiz(unit, n=2):
+    qs = []
+    for mistake, why in unit["anti"][:n]:
+        qs.append({
+            "type": "judge",
+            "q": f"判断：「{mistake}」是鉴赏时的正确做法。",
+            "options": ["正确", "错误"],
+            "answer": 1,
+            "explain": why,
+        })
+    return qs
+
+for u in units:
+    quiz = []
+    quiz += make_def_quiz(u, 6)
+    quiz += make_work_quiz(u, 3)
+    quiz += make_judge_quiz(u, 2)
+    u["quiz"] = quiz
+
+# ---------- markdown -> html（用于速查表） ----------
+def md_to_html(md):
+    out = []
+    table = []
+    def flush():
+        if table:
+            out.append("<table>" + "".join(table) + "</table>")
+            table.clear()
+    for ln in md.splitlines():
+        s = ln.rstrip()
+        if s.startswith("# "):
+            flush(); out.append(f"<h2>{s[2:].strip()}</h2>")
+        elif s.startswith("## "):
+            flush(); out.append(f"<h3>{s[3:].strip()}</h3>")
+        elif s.startswith("> "):
+            flush(); out.append(f"<p class='note'>{s[2:].strip()}</p>")
+        elif s.startswith("|"):
+            if re.match(r'^\|[\s\-:|]+\|$', s):
+                continue
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            tag = "th" if not table else "td"
+            row = "<tr>" + "".join(f"<{tag}>{c}</{tag}>" for c in cells) + "</tr>"
+            table.append(row)
+        elif s.strip() == "":
+            flush()
+        else:
+            flush(); out.append(f"<p>{s.strip()}</p>")
+    flush()
+    return "\n".join(out)
+
+# ---------- 解析 glossary / cheatsheet ----------
+glossary = []
+for ln in read(os.path.join(SKILL, "glossary.md")).splitlines():
+    m = re.match(r'\*\*(.+?)\*\*[\s—-]+(.*)$', ln.strip())
+    if m:
+        glossary.append({"term": m.group(1).strip(), "def": m.group(2).strip()})
+
+cheatsheet_html = md_to_html(read(os.path.join(SKILL, "cheatsheet.md")))
+
+def md_to_html(md):
+    out = []
+    table = []
+    def flush():
+        if table:
+            out.append("<table>" + "".join(table) + "</table>")
+            table.clear()
+    for ln in md.splitlines():
+        s = ln.rstrip()
+        if s.startswith("# "):
+            flush(); out.append(f"<h2>{s[2:].strip()}</h2>")
+        elif s.startswith("## "):
+            flush(); out.append(f"<h3>{s[3:].strip()}</h3>")
+        elif s.startswith("> "):
+            flush(); out.append(f"<p class='note'>{s[2:].strip()}</p>")
+        elif s.startswith("|"):
+            if re.match(r'^\|[\s\-:|]+\|$', s):
+                continue
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            tag = "th" if not table else "td"
+            row = "<tr>" + "".join(f"<{tag}>{c}</{tag}>" for c in cells) + "</tr>"
+            table.append(row)
+        elif s.strip() == "":
+            flush()
+        else:
+            flush(); out.append(f"<p>{s.strip()}</p>")
+    flush()
+    return "\n".join(out)
+
+def md_to_html(md):
+    out = []
+    table = []
+    def flush():
+        if table:
+            out.append("<table>" + "".join(table) + "</table>")
+            table.clear()
+    for ln in md.splitlines():
+        s = ln.rstrip()
+        if s.startswith("# "):
+            flush(); out.append(f"<h2>{s[2:].strip()}</h2>")
+        elif s.startswith("## "):
+            flush(); out.append(f"<h3>{s[3:].strip()}</h3>")
+        elif s.startswith("> "):
+            flush(); out.append(f"<p class='note'>{s[2:].strip()}</p>")
+        elif s.startswith("|"):
+            if re.match(r'^\|[\s\-:|]+\|$', s):
+                continue
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            tag = "th" if not table else "td"
+            row = "<tr>" + "".join(f"<{tag}>{c}</{tag}>" for c in cells) + "</tr>"
+            table.append(row)
+        elif s.strip() == "":
+            flush()
+        else:
+            flush(); out.append(f"<p>{s.strip()}</p>")
+    flush()
+    return "\n".join(out)
+
+data = {
+    "book": "普通高中教科书·音乐·必修·音乐鉴赏（人音版 2019）",
+    "units": units,
+    "glossary": glossary,
+    "cheatsheet": cheatsheet_html,
+}
+
+with open(OUT, "w", encoding="utf-8") as f:
+    f.write("// 自动生成，请勿手改；重新运行 generate_data.py 可刷新\n")
+    f.write("window.COURSE_DATA = ")
+    json.dump(data, f, ensure_ascii=False, indent=1)
+    f.write(";\n")
+
+print("units:", len(units))
+print("glossary:", len(glossary))
+tot_q = sum(len(u["quiz"]) for u in units)
+print("total quiz questions:", tot_q)
+for u in units:
+    print(f"  {u['id']} {u['title'][:24]:24} 概念{len(u['concepts'])+len(u['frameworks'])} 作品{len(u['works'])} 题{len(u['quiz'])}")
