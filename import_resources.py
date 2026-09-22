@@ -219,7 +219,9 @@ def main():
                 rel = os.path.relpath(dst, ROOT).replace("\\", "/")
                 ent = {"name": disp, "file": f, "path": rel, "size": os.path.getsize(dst)}
                 if kind == "ppt":
-                    info = ppt_urls.get(f"{uid}/{f}")
+                    # ppt_urls 的 key 用的是落盘名（safe() 改过名的，如 "京剧传统戏__2_.pptx"），
+                    # resources.js 里的 f 是源目录原名（"京剧传统戏 (2).pptx"），两个都试一下
+                    info = ppt_urls.get(f"{uid}/{f}") or ppt_urls.get(f"{uid}/{safe(f)}")
                     if info:                      # PPT 走 Release 附件下载（原始画质）
                         ent["asset"] = info["asset"]
                         ent["url"] = info["url"]

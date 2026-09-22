@@ -256,7 +256,7 @@ function showUnit(id){
   const EX = (window.AUDIO_EXTRA && window.AUDIO_EXTRA[u.id]) || [];
   if(EX.length){
     h += `<div class="card"><h3>🎧 拓展聆听（选听）</h3><div class="works">${EX.map((x,i)=>
-      `<div class="work"><div class="meta"><div class="n">${esc(x.name)}</div><div class="a">拓展与探究 · 课外聆听</div></div><button class="play" onclick="playExtra(${JSON.stringify(u.id)},${i},this)">▶ 播放</button></div>`
+      `<div class="work"><div class="meta"><div class="n">${esc(x.name)}</div><div class="a">拓展与探究 · 课外聆听</div></div><button class="play" onclick="playExtra('${esc(u.id)}',${i},this)">▶ 播放</button></div>`
     ).join("")}</div></div>`;
   }
   // 配套资源（PPT 课件 + 教案）

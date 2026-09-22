@@ -80,43 +80,42 @@ def main():
     if not UP:
         return
     ensure_release()
+    r = gh("release", "view", TAG, "--json", "assets", "--jq", ".assets[].name")
+    existing = set(x.strip() for x in r.stdout.splitlines() if x.strip())
     items = sorted(plan.values(), key=lambda v: (v["unit"], v["no"]))
+    todo = [v for v in items if v["asset"] not in existing]
+    print(f"附件区已有 {len(existing)} 个；本次需上传 {len(todo)} 个")
+    if not todo:
+        print("全部附件均已就绪")
+        return
     BATCH_MB = 450
-    batch, bsz, done = [], 0, 0
-    batches = []
-    for v in items:
+    batches, batch, bsz = [], [], 0
+    for v in todo:
         batch.append(v); bsz += v["size"] / 1048576
         if bsz >= BATCH_MB:
             batches.append(batch); batch, bsz = [], 0
     if batch:
         batches.append(batch)
+    tmpdir = os.path.join(ROOT, ".ppt_upload_tmp")
+    os.makedirs(tmpdir, exist_ok=True)
+    done = 0
     for bi, b in enumerate(batches, 1):
-        paths = [os.path.join(PPT_DIR, v["unit"], v["orig"]) for v in b]
-        # 附件名要 ASCII：先把副本改成目标名放到临时目录再传
-        tmpdir = os.path.join(ROOT, ".ppt_upload_tmp")
-        os.makedirs(tmpdir, exist_ok=True)
         named = []
-        for p, v in zip(paths, b):
+        for v in b:
             dst = os.path.join(tmpdir, v["asset"])
             if not os.path.exists(dst) or os.path.getsize(dst) != v["size"]:
-                subprocess.run(["cp", p, dst], check=True)
+                src = os.path.join(PPT_DIR, v["unit"], v["orig"])
+                try:
+                    os.link(src, dst)          # 硬链接：瞬间完成、不额外占磁盘
+                except OSError:
+                    subprocess.run(["cp", src, dst], check=True)
             named.append(dst)
         r = gh("release", "upload", TAG, *named, "--clobber")
         if r.returncode != 0:
             print(f"第 {bi} 批失败：", r.stderr.strip()[:400]); sys.exit(1)
-        for dst in named:                      # 传完就删副本，别白占 2GB
-            try:
-                os.remove(dst)
-            except OSError:
-                pass
         done += len(b)
-        print(f"第 {bi}/{len(batches)} 批完成（累计 {done}/{len(items)} 个，"
-              f"{sum(x['size'] for x in items[:done])/1073741824:.2f}GB）", flush=True)
-    try:
-        os.rmdir(os.path.join(ROOT, ".ppt_upload_tmp"))
-    except OSError:
-        pass
-    print("全部附件上传完成")
+        print(f"第 {bi}/{len(batches)} 批完成（累计 {done}/{len(todo)} 个）", flush=True)
+    print(f"全部附件上传完成。临时目录（硬链接）可稍后清理：{tmpdir}")
 
 
 if __name__ == "__main__":

@@ -241,7 +241,9 @@ window.RESOURCES = {
     "name": "京剧传统戏 (2)",
     "file": "京剧传统戏 (2).pptx",
     "path": "media/ppt/ch04/京剧传统戏__2_.pptx",
-    "size": 45675487
+    "size": 45675487,
+    "asset": "ch04-03.pptx",
+    "url": "https://github.com/liteng0401/music-appreciation-classroom/releases/download/ppt-v1/ch04-03.pptx"
    },
    {
     "name": "京剧传统戏",
@@ -369,7 +371,9 @@ window.RESOURCES = {
     "name": "聂耳 金蛇狂舞欣赏",
     "file": "聂耳 金蛇狂舞欣赏.ppt",
     "path": "media/ppt/ch10/聂耳_金蛇狂舞欣赏.ppt",
-    "size": 422912
+    "size": 422912,
+    "asset": "ch10-07.ppt",
+    "url": "https://github.com/liteng0401/music-appreciation-classroom/releases/download/ppt-v1/ch10-07.ppt"
    }
   ],
   "jiaoan": [
