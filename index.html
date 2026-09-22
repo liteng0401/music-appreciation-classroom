@@ -126,10 +126,16 @@
   /* 注意：.hidden 必须带 !important。
      下面 .note-panel / .sup-note 等规则也声明了 display，且位置更靠后，
      同优先级下后者覆盖前者，会让 hidden 失效（2026-09-22 课堂便签实测踩过）。 */
-  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;position:relative;z-index:30}
   .topbar button{font-size:13px;padding:6px 12px;border:1px solid var(--line);background:var(--chip);border-radius:8px;cursor:pointer;color:var(--ink)}
+  /* 手机端侧栏展开时的遮罩：点空白也能关，且必须低于侧栏(20) / 低于顶栏按钮(30) */
+  #sideBackdrop{display:none;border:0;padding:0}
+  /* 桌面端：侧栏可整体收起，把宽度让给正文。
+     原来 .open 在 >760px 下没有任何样式，导致「☰ 目录」是个空操作（用户报的 bug）。 */
+  @media (min-width:761px){ .app.side-collapsed .side{display:none} }
   @media (max-width:760px){.side{position:fixed;z-index:20;height:100%;transform:translateX(-100%);transition:.2s}
-    .side.open{transform:none}.main{padding:18px}}
+    .side.open{transform:none}.main{padding:18px}
+    #sideBackdrop.show{display:block;position:fixed;inset:0;z-index:15;background:rgba(0,0,0,.38);cursor:pointer}}
   /* 校本便签（全局悬浮） */
   .note-fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:80;font-family:inherit}
   .note-fab-btn{width:54px;height:54px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
@@ -160,12 +166,13 @@
     <div id="nav"></div>
     <div class="tools"><button id="themeBtn">🌓 切换深色</button></div>
   </aside>
+  <button id="sideBackdrop" type="button" aria-label="关闭目录"></button>
 
   <main class="main">
     <div class="wrap">
       <div class="topbar">
         <div id="crumb" style="color:var(--muted);font-size:13px"></div>
-        <button onclick="toggleSide()">☰ 目录</button>
+        <button id="sideToggle" onclick="toggleSide()" aria-expanded="true" aria-controls="side">☰ 目录</button>
       </div>
       <div id="content"></div>
     </div>
@@ -469,8 +476,60 @@ function showView(v){
   }
 }
 
-function toggleSide(){ $("#side").classList.toggle("open"); }
-function closeSide(){ if(window.innerWidth<=760) $("#side").classList.remove("open"); }
+// ── 目录（侧栏）开关 ──────────────────────────────────────────────────────────
+// 手机（≤760px）：侧栏是固定浮层，.open 控制滑入滑出，并配一层遮罩。
+// 桌面（>760px）：侧栏常驻，用 .app.side-collapsed 把它整个收起。
+//   修的是这个 bug：以前两种宽度都只 toggle 一个 .open，而 >760px 没有 .open 的样式，
+//   于是「☰ 目录」在电脑上点了完全没反应（用户 2026-09-22 报的）。
+const isMobileSide = () => window.innerWidth <= 760;
+function sideIsOpen(){
+  return isMobileSide()
+    ? $("#side").classList.contains("open")
+    : !$(".app").classList.contains("side-collapsed");
+}
+function syncSideBtn(){
+  const b = $("#sideToggle");
+  if(!b) return;
+  const open = sideIsOpen();
+  // 文案跟着状态走 —— 让人一眼看出"再点一下能收起来"，而不是以为按钮坏了
+  b.textContent = open ? "✕ 关闭目录" : "☰ 目录";
+  b.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function toggleSide(){
+  const side = $("#side"), app = $(".app"), bd = $("#sideBackdrop");
+  if(isMobileSide()){
+    const on = side.classList.toggle("open");
+    if(bd) bd.classList.toggle("show", on);
+  } else {
+    app.classList.toggle("side-collapsed");
+  }
+  syncSideBtn();
+}
+function closeSide(){
+  const side = $("#side"), bd = $("#sideBackdrop");
+  // 桌面端的常驻侧栏不在这里收起 —— 否则每点一个单元侧栏都会消失，反而碍事
+  if(isMobileSide()){
+    side.classList.remove("open");
+    if(bd) bd.classList.remove("show");
+  }
+  syncSideBtn();
+}
+// 点遮罩 / 按 Esc 也能关
+document.addEventListener("click", e=>{ if(e.target && e.target.id === "sideBackdrop") closeSide(); });
+document.addEventListener("keydown", e=>{ if(e.key === "Escape") closeSide(); });
+// 跨断点（旋转屏幕 / 拖窗口）时把两种模式的状态收拾干净，别互相残留
+let _sideWasMobile = window.innerWidth <= 760;
+window.addEventListener("resize", ()=>{
+  const mob = isMobileSide();
+  if(mob !== _sideWasMobile){
+    _sideWasMobile = mob;
+    $("#side").classList.remove("open");
+    $(".app").classList.remove("side-collapsed");
+    const bd = $("#sideBackdrop"); if(bd) bd.classList.remove("show");
+  }
+  syncSideBtn();
+});
+
 function setTheme(t){ document.documentElement.dataset.theme=t; localStorage.setItem("ma-theme",t);
   $("#themeBtn").textContent = t==="dark"?"☀️ 切换浅色":"🌓 切换深色"; }
 $("#themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
@@ -503,6 +562,7 @@ $("#noteClear").onclick=()=>{
 
 // init
 buildNav();
+syncSideBtn();              // 目录按钮的初始文案/aria 跟着实际状态走
 setTheme(localStorage.getItem("ma-theme")||"light");
 showView("home");
 </script>
