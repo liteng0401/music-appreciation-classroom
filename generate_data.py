@@ -182,17 +182,38 @@ for fn in chapter_files:
 
 # ---------- 生成练习题 ----------
 random.seed(20260921)
+
+def dedup_terms(pairs):
+    """按术语去重，保留首次出现（frameworks 与 concepts 常撞名，
+    不去重会让 random.sample 抽到同一术语出两道一模一样的题）。"""
+    out, seen = [], set()
+    for t, d in pairs:
+        if t in seen:
+            continue
+        seen.add(t)
+        out.append((t, d))
+    return out
+
 def make_def_quiz(unit, n=6):
-    pool = [(f["term"], f["def"]) for f in unit["frameworks"]] + [(c["term"], c["def"]) for c in unit["concepts"]]
+    pool = dedup_terms(
+        [(f["term"], f["def"]) for f in unit["frameworks"]]
+        + [(c["term"], c["def"]) for c in unit["concepts"]]
+    )
     if len(pool) < 2:
         return []
     chosen = random.sample(pool, min(n, len(pool)))
     qs = []
     for term, correct in chosen:
-        distract = [d for t, d in pool if d != correct]
+        # 干扰项按「释义」去重，避免同一题里出现两个字面相同的选项
+        distract = []
+        for t, d in pool:
+            if t == term or d in distract or d == correct:
+                continue
+            distract.append(d)
         random.shuffle(distract)
         opts = [correct] + distract[:3]
         random.shuffle(opts)
+        assert len(set(opts)) == len(opts), f"{unit['id']} 「{term}」选项重复"
         qs.append({
             "type": "choice",
             "q": f"下列关于「{term}」的表述，正确的是？",
@@ -206,11 +227,16 @@ def make_work_quiz(unit, n=3):
     qs = []
     works = [w for w in unit["works"] if w["author"]]
     for w in works[:n]:
-        # 作者题
-        pool_auth = [x["author"] for x in unit["works"] if x["author"] and x["author"] != w["author"]]
+        # 作者题：干扰作者池同样要按文本去重（如 ch09 两部作品作者都写"古曲"）
+        pool_auth = []
+        for x in unit["works"]:
+            a = x["author"]
+            if a and a != w["author"] and a not in pool_auth:
+                pool_auth.append(a)
         if len(pool_auth) >= 1:
             opts = [w["author"]] + random.sample(pool_auth, min(3, len(pool_auth)))
             random.shuffle(opts)
+            assert len(set(opts)) == len(opts), f"{unit['id']} 《{w['name']}》选项重复"
             qs.append({
                 "type": "choice",
                 "q": f"《{w['name'].strip('《》')}》的作曲/来源是？",
@@ -220,14 +246,31 @@ def make_work_quiz(unit, n=3):
             })
     return qs
 
+_used_judge = set()          # 跨单元已用过的错误做法，避免两个单元出同一道判断题
+
 def make_judge_quiz(unit, n=2):
+    """由 Anti-patterns（易错做法）生成判断题。
+    注意 anti 的元素是 dict，必须按键取值——直接 `for a, b in anti` 会把
+    dict 当元组解包，解出的是键名 "mistake"/"why"（曾导致 38 道题全废）。"""
+    items = unit["anti"] or []
+    pick = [a for a in items if a["mistake"] not in _used_judge][:n]
+    if len(pick) < n:                                  # 本单元新条目不够，用重复项补足
+        pick += [a for a in items if a not in pick][: n - len(pick)]
     qs = []
-    for mistake, why in unit["anti"][:n]:
+    for k, a in enumerate(pick):
+        mistake, why = a["mistake"], a["why"]
+        _used_judge.add(mistake)
+        if k % 2 == 0:
+            # 反问式：把"错误做法"说成正确 → 答案「错误」
+            q, ans = f"判断：{mistake}，这是鉴赏时的正确做法。", 1
+        else:
+            # 正述式：把"应当避免的错误做法"正面陈述 → 答案「正确」
+            q, ans = f"判断：鉴赏时应避免{mistake}。", 0
         qs.append({
             "type": "judge",
-            "q": f"判断：「{mistake}」是鉴赏时的正确做法。",
+            "q": q,
             "options": ["正确", "错误"],
-            "answer": 1,
+            "answer": ans,
             "explain": why,
         })
     return qs
@@ -238,6 +281,53 @@ for u in units:
     quiz += make_work_quiz(u, 3)
     quiz += make_judge_quiz(u, 2)
     u["quiz"] = quiz
+
+# ---------- 自检：题干/选项不得重复 ----------
+def _norm(s):
+    return re.sub(r"\s+", "", str(s or ""))
+
+def audit_quizzes(units):
+    problems = []
+    for u in units:
+        seen = {}
+        for i, q in enumerate(u["quiz"]):
+            k = _norm(q["q"])
+            if k in seen:
+                problems.append(f"{u['id']} 题干重复: 第{seen[k]+1}题 == 第{i+1}题")
+            seen[k] = i
+            opts = [_norm(o) for o in q["options"]]
+            if len(set(opts)) != len(opts):
+                problems.append(f"{u['id']} 第{i+1}题选项重复: {q['options']}")
+            if len(opts) < 2:
+                problems.append(f"{u['id']} 第{i+1}题选项不足: {q['options']}")
+            if not (0 <= q["answer"] < len(opts)):
+                problems.append(f"{u['id']} 第{i+1}题答案越界")
+            if not q.get("explain"):
+                problems.append(f"{u['id']} 第{i+1}题缺解析")
+    # 跨单元
+    g = {}
+    for u in units:
+        for i, q in enumerate(u["quiz"]):
+            g.setdefault(_norm(q["q"]), []).append(u["id"])
+    for k, ids in g.items():
+        if len(set(ids)) > 1:
+            problems.append(f"跨单元题干重复: {'/'.join(ids)} | {k}")
+    return problems
+
+_problems = audit_quizzes(units)
+if _problems:
+    print("!! 习题自检发现问题:")
+    for p in _problems:
+        print("   -", p)
+else:
+    print("习题自检: 通过（无重复题干 / 无重复选项 / 答案与解析齐全）")
+
+_judge_dist = {}
+for u in units:
+    for q in u["quiz"]:
+        if q["type"] == "judge":
+            _judge_dist[q["answer"]] = _judge_dist.get(q["answer"], 0) + 1
+print("判断题答案分布:", {("错误" if k == 1 else "正确"): v for k, v in sorted(_judge_dist.items())})
 
 # ---------- markdown -> html（用于速查表） ----------
 def md_to_html(md):
