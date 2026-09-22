@@ -116,6 +116,32 @@ def parse_works(body):
         works.append({"name": name, "author": author, "genre": genre})
     return works
 
+def extract_works_tables(md):
+    """扫描全章所有含「曲名」表头的 markdown 表格，合并为作品列表。
+    兼容两种布局：上篇有 `## 作品鉴赏…` 标题；下篇只在正文里写
+    `**本单元【作品鉴赏】全部曲目：**` + 表格（无独立标题）。"""
+    lines = md.splitlines()
+    works = []
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        if s.startswith("|") and "曲名" in s:
+            rows = []
+            j = i + 1
+            if j < len(lines) and re.match(r'^\|[\s\-:|]+\|$', lines[j].strip()):
+                j += 1
+            while j < len(lines) and lines[j].strip().startswith("|"):
+                rows.append(lines[j]); j += 1
+            works += parse_works("\n".join(rows))
+            i = j
+        else:
+            i += 1
+    seen, out = set(), []
+    for w in works:
+        if w["name"] and w["name"] not in seen:
+            seen.add(w["name"]); out.append(w)
+    return out
+
 # ---------- 解析各章 ----------
 units = []
 all_defs = []  # (term, def) 全局池，用于干扰项
@@ -134,13 +160,7 @@ for fn in chapter_files:
     takeaways = parse_simple_bullets(blocks.get("Key Takeaways", ""))
     worked = blocks.get("Worked Example", "")
     core = blocks.get("Core Idea", "")
-    works = parse_works(blocks.get("作品鉴赏（第一单元全部曲目）", "") or blocks.get("作品鉴赏", "") or "")
-    # 作品鉴赏 表头可能在 "## 作品鉴赏" 段落；上面 key 可能为 '作品鉴赏' 或带括号
-    if not works:
-        for k, v in blocks.items():
-            if k.startswith("作品鉴赏"):
-                works = parse_works(v)
-                break
+    works = extract_works_tables(md)
 
     concept_pool = frameworks + concepts
     for t, d, _ in concept_pool:

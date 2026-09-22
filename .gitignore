@@ -1,0 +1,7 @@
+# PPT 原件走 GitHub Release 附件区下载（见 publish_ppt.py），不进仓库——
+# 2.0GB 会超出 GitHub 对仓库/Pages 站点的 1GB 建议上限。
+media/ppt/
+.ppt_upload_tmp/
+.DS_Store
+__pycache__/
+*.pyc
