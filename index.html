@@ -117,21 +117,25 @@
   table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px}
   th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
   th{background:var(--chip)}
-  .hidden{display:none}
+  .hidden{display:none !important}
+  /* 注意：.hidden 必须带 !important。
+     下面 .note-panel / .sup-note 等规则也声明了 display，且位置更靠后，
+     同优先级下后者覆盖前者，会让 hidden 失效（2026-09-22 课堂便签实测踩过）。 */
   .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
   .topbar button{font-size:13px;padding:6px 12px;border:1px solid var(--line);background:var(--chip);border-radius:8px;cursor:pointer;color:var(--ink)}
   @media (max-width:760px){.side{position:fixed;z-index:20;height:100%;transform:translateX(-100%);transition:.2s}
     .side.open{transform:none}.main{padding:18px}}
   /* 校本便签（全局悬浮） */
-  .note-fab{position:fixed;right:18px;bottom:18px;z-index:60;font-family:inherit}
+  .note-fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:80;font-family:inherit}
   .note-fab-btn{width:54px;height:54px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
-  .note-panel{position:absolute;right:0;bottom:66px;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.2);padding:12px;display:flex;flex-direction:column;gap:8px}
+  .note-panel{position:absolute;right:0;bottom:calc(80px + env(safe-area-inset-bottom,0px));width:300px;max-height:min(70vh,520px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.2);padding:12px;display:flex;flex-direction:column;gap:8px}
   .note-head{font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .note-mini-grp{display:flex;gap:6px;flex:0 0 auto}
   .note-mini{font-size:12px;padding:3px 9px;border:1px solid var(--line);background:var(--chip);border-radius:7px;cursor:pointer;color:var(--ink)}
   #noteArea{width:100%;height:150px;resize:vertical;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-size:14px;font-family:inherit;line-height:1.6}
   .note-foot{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
   .note-saved{color:var(--ok);font-weight:600}
-  @media (max-width:760px){.note-panel{width:calc(100vw - 36px)}}
+  @media (max-width:760px){.note-panel{width:calc(100vw - 36px);max-height:min(58vh,420px)}#noteArea{height:104px}}
 </style>
 </head>
 <body>
@@ -166,7 +170,7 @@
   <!-- 校本便签 -->
   <div class="note-fab">
     <div id="notePanel" class="note-panel hidden">
-      <div class="note-head"><span>📝 课堂便签</span><button id="noteClear" class="note-mini">清空</button></div>
+      <div class="note-head"><span>📝 课堂便签</span><span class="note-mini-grp"><button id="noteClear" class="note-mini">清空</button><button id="noteClose" class="note-mini">✕ 关闭</button></span></div>
       <textarea id="noteArea" placeholder="上课随手记：本校补充、重点提醒、学生表现……（仅保存在本机浏览器）"></textarea>
       <div class="note-foot"><span id="noteSaved"></span><span>自动保存</span></div>
     </div>
@@ -459,6 +463,13 @@ noteArea.addEventListener("input",()=>{
   },400);
 });
 $("#noteToggle").onclick=()=>notePanel.classList.toggle("hidden");
+$("#noteClose").onclick=()=>notePanel.classList.add("hidden");
+// 点面板以外的地方也收起（手机上更顺手）
+document.addEventListener("click",e=>{
+  if(notePanel.classList.contains("hidden")) return;
+  if(notePanel.contains(e.target) || $("#noteToggle").contains(e.target)) return;
+  notePanel.classList.add("hidden");
+});
 $("#noteClear").onclick=()=>{
   if(noteArea.value && !confirm("确定清空便签内容？")) return;
   noteArea.value=""; localStorage.removeItem(NOTE_KEY); noteSaved.textContent="已清空";
