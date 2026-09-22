@@ -2,6 +2,11 @@
 # 2.0GB 会超出 GitHub 对仓库/Pages 站点的 1GB 建议上限。
 media/ppt/
 .ppt_upload_tmp/
+# 按单元打好的课件 zip（上传微云用），同样不进仓库
+.ppt_zip/
 .DS_Store
 __pycache__/
 *.pyc
+
+# 微云上传的断点续传状态（每次上传都在变，不进仓库）
+tools/weiyun_uploaded.json
