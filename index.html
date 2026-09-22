@@ -71,6 +71,26 @@
   .res-item .rbtn{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;border:1px solid var(--brand2);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;color:var(--brand2);background:transparent;font-family:inherit;text-decoration:none;transition:.15s}
   .res-item .rbtn:hover{background:var(--brand2);color:#fff}
   .res-tip{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.7}
+  /* 补充资料区（教师投稿） */
+  .sup-sub{font-size:13px;color:var(--muted);margin:2px 0 10px}
+  .sup-list{display:grid;grid-template-columns:1fr;gap:8px}
+  .sup-item{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--chip);display:flex;align-items:center;gap:10px}
+  .sup-badge{flex:0 0 auto;font-size:11px;padding:3px 10px;border-radius:20px;color:#fff;letter-spacing:.5px;white-space:nowrap}
+  .sup-badge.audio{background:var(--brand2)}
+  .sup-badge.video{background:#8e44ad}
+  .sup-badge.ppt{background:var(--accent);color:#4a3500}
+  .sup-badge.text{background:var(--ok)}
+  .sup-meta{flex:1 1 auto;min-width:0}
+  .sup-n{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sup-a{font-size:12px;color:var(--muted);margin-top:2px}
+  .sup-note{grid-column:1/-1;font-size:14px;color:var(--ink);background:var(--bg);border:1px dashed var(--line);border-radius:9px;padding:11px 14px;line-height:1.8}
+  .sup-empty{font-size:13px;color:var(--muted);background:var(--chip);border-radius:9px;padding:11px 14px;line-height:1.7}
+  .sup-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+  .sup-submit{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:20px;padding:8px 18px;font-size:14px;cursor:pointer;color:#fff;background:var(--brand);font-family:inherit;text-decoration:none}
+  .sup-submit:hover{filter:brightness(1.08)}
+  .sup-dead{font-size:13px;color:var(--muted);background:var(--chip);border-radius:20px;padding:7px 16px}
+  .sup-toggle{flex:0 0 auto;border:1px solid var(--brand2);border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;color:var(--brand2);background:transparent;font-family:inherit;text-decoration:none;transition:.15s}
+  .sup-toggle:hover{background:var(--brand2);color:#fff}
   /* 测验 */
   .quiz .q{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
   .q .qt{font-weight:600;margin-bottom:10px}
@@ -160,6 +180,7 @@
 <script src="audio.js"></script>
 <script src="audio_extra.js"></script>
 <script src="resources.js"></script>
+<script src="supplementary.js"></script>
 <script>
 const D = window.COURSE_DATA;
 const $ = (s,el=document)=>el.querySelector(s);
@@ -224,6 +245,59 @@ function playExtra(uid, i, btn){
 }
 function stopAudio(){ if(curAudio) curAudio.pause(); setPlayBtn(null); barShow(false,''); }
 
+/* ---------- 补充资料区（教师投稿） ---------- */
+const SUP_TYPE = {audio:"音频", video:"视频", ppt:"PPT", text:"文本"};
+/* 投稿内容来自外部（问卷），一律转义 + 只放行 http(s) 链接 */
+function supEsc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function supUrl(u){u=String(u==null?"":u).trim();return /^https?:\/\//i.test(u)?u:"";}
+function supOf(uid){const S=window.SUPPLEMENTARY||{};return (S.units&&S.units[uid])||[];}
+function playSup(uid,i,btn){
+  const it=supOf(uid)[i]; if(!it) return;
+  const src=supUrl(it.url); if(!src) return;
+  playSrc(src, it.title, btn);
+}
+function toggleSup(uid,i,btn){
+  const el=document.getElementById('supnote-'+uid+'-'+i); if(!el) return;
+  el.classList.toggle('hidden');
+  btn.textContent = el.classList.contains('hidden') ? '展开阅读' : '收起';
+}
+function supportCard(uid){
+  const S=window.SUPPLEMENTARY||{}, sub=S.submit||{};
+  const list=supOf(uid);
+  const rows=list.map((it,i)=>{
+    const t=SUP_TYPE[it.t]?it.t:'text', label=SUP_TYPE[t];
+    const url=supUrl(it.url);
+    const meta=`<div class="sup-meta"><div class="sup-n">${supEsc(it.title)||'（未命名）'}</div>`
+      +`<div class="sup-a">${[it.by?('投稿：'+it.by):'',it.size||'',it.date||''].filter(Boolean).map(supEsc).join(' · ')||'教师投稿'}</div></div>`;
+    let action='';
+    if(t==='audio' && url) action=`<button class="play" onclick="playSup('${supEsc(uid)}',${i},this)">▶ 播放</button>`;
+    else if(t==='video' && url) action=`<a class="sup-toggle" href="${supEsc(url)}" target="_blank" rel="noopener">▶ 播放 ↗</a>`;
+    else if(t==='ppt' && url) action=`<a class="sup-toggle" href="${supEsc(url)}" target="_blank" rel="noopener" download>下载 ↗</a>`;
+    else if(t==='text') action=`<button class="sup-toggle" onclick="toggleSup('${supEsc(uid)}',${i},this)">展开阅读</button>`;
+    else action=`<span class="sup-a">链接待补</span>`;
+    let extra='';
+    if(t==='text'){
+      const body=supEsc(it.note).replace(/\n/g,'<br>');
+      extra=`<div class="sup-note hidden" id="supnote-${supEsc(uid)}-${i}">${body||'（暂无正文）'}`
+        +(url?`<div style="margin-top:8px"><a href="${supEsc(url)}" target="_blank" rel="noopener" style="color:var(--brand2)">查看原文 ↗</a></div>`:'')+`</div>`;
+    }else if(it.note){
+      extra=`<div class="sup-note">${supEsc(it.note).replace(/\n/g,'<br>')}</div>`;
+    }
+    return `<div class="sup-item"><span class="sup-badge ${t}">${label}</span>${meta}${action}</div>${extra}`;
+  }).join('');
+  const submitUrl=supUrl(sub.url);
+  const cta=submitUrl
+    ? `<a class="sup-submit" href="${supEsc(submitUrl)}" target="_blank" rel="noopener">＋ 提交补充材料</a>`
+    : `<span class="sup-dead">投稿入口尚未开放</span>`;
+  return `<div class="card"><h3>🗂 补充资料区</h3>`
+    +`<div class="sup-sub">教师投稿 · 本单元共 ${list.length} 项</div>`
+    +(list.length?`<div class="sup-list">${rows}</div>`
+      :`<div class="sup-empty">本单元暂无补充材料。欢迎把好用的音频、视频、PPT 或文字资料投到这里，审核后会展示给全组老师。</div>`)
+    +`<div class="sup-actions">${cta}</div>`
+    +(sub.tip?`<div class="res-tip">${supEsc(sub.tip)}</div>`:'')
+    +`</div>`;
+}
+
 function termCard(t){
   return `<div class="term"><b>${esc(t.term)}</b><span class="d">${esc(t.def)}</span>${t.detail?`<span class="dt">${esc(t.detail).replace(/\n/g,'<br>')}</span>`:''}</div>`;
 }
@@ -269,6 +343,8 @@ function showUnit(id){
     if(R.jiaoan && R.jiaoan.length) inner += `<div class="res-sub">📄 教案 Word · ${R.jiaoan.length} 份</div><div class="res-list">${R.jiaoan.map(x=>row(x,"▫")).join("")}</div>`;
     h += `<div class="card"><h3>📎 配套资源下载</h3>${inner}<div class="res-tip">PPT 课件为原文件、画质未压缩，点击后从附件区下载（文件名会变成「课次-序号」，如 ch04-02.pptx，与本页条目顺序一一对应）；教案为原文件名。文件较大，建议在电脑端下载。</div></div>`;
   }
+  // 补充资料区（教师投稿）
+  h += supportCard(u.id);
   if(u.worked){
     h += `<div class="card"><h3>🎯 聆听示范</h3><div style="white-space:pre-wrap;font-size:14px">${esc(u.worked)}</div></div>`;
   }
@@ -340,7 +416,7 @@ function updateScore(){
 function showView(v){
   if(v==="home"){ crumb.textContent="总览";
     $("#content").innerHTML = `<div class="uhead"><h2>欢迎使用《音乐鉴赏》互动课堂</h2></div>
-      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念。右下角 📝 便签可随手记录校本补充。</div>
+      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念。右下角 📝 便签可随手记录校本补充。每单元底部的 <b>🗂 补充资料区</b> 收纳老师们自己投稿的音频、视频、PPT 与文字资料——点「＋ 提交补充材料」即可投稿。</div>
       <div class="card"><h3>📚 全书结构</h3><ul class="clean">
       ${D.units.map(u=>`<li><a href="#" onclick="showUnit('${u.id}')" style="color:var(--brand2)">${esc(u.title.replace(/（.*$/,'') )}</a></li>`).join("")}
       </ul></div>`;

@@ -13,6 +13,7 @@
 - **作品音频播放**：每首作品卡片带「▶ 播放」按钮（有音频才显示），点击即播；底部悬浮播放条显示曲名、可停止
 - **🎧 拓展聆听（选听）**：教材「拓展与探究」里未列入正文曲目表的音频，按课本编号归入对应单元，同样可点播
 - **📎 配套资源下载**：每单元列出配套的 PPT 课件与教案 Word，显示文件名与体积，点击即下载
+- **🗂 补充资料区**：每单元底部一块「教师投稿」区，收录老师们自己上传的 **音频 / 视频 / PPT / 文本** 资料；音频走页面统一的浮动播放条，文本可页面内展开阅读；配「＋ 提交补充材料」入口（指向腾讯问卷投稿表单）
 
 ## 使用
 - **公网在线打开**：https://liteng0401.github.io/music-appreciation-classroom/ （GitHub Pages，仓库已公开）
@@ -47,6 +48,12 @@
 - `school-badge.png` / `school-badge-display.png` — 早期使用的单色金色字标（已弃用，保留备用）
 - `generate_ppt.py` — 由章节自动生成每节 PPT 课件（python-pptx），输出到 `./ppt`
 - `ppt/` — 本项目自制的每节上课用 PPT 课件（35 份）
+- `supplementary.js` — **补充资料区数据**（`window.SUPPLEMENTARY`：单元 → 投稿条目列表 + 投稿入口链接）；日常由 `ingest_supplement.py` 生成，也可手工加条目
+- `course_meta.py` — 共享工具：从 `data.js` 解析单元/作品，产出 `unit_index.json`（问卷与回填脚本共用的真源）
+- `build_survey.py` — 生成「补充资料投稿」腾讯问卷的纯文本定义（单元+课程联动题）
+- `ingest_supplement.py` — 把问卷回答回填成 `supplementary.js`
+- `survey_text_linked.txt` / `survey_text_twodropdown.txt` — 上面生成的问卷定义（联动题版 / 两个下拉题兜底版）
+- `unit_index.json` — 单元标签 ↔ `chXX` 映射，供问卷生成与回填使用
 - `import_audio.py` — 音频匹配的核心逻辑（曲名归一化 + 二元组相似度打分 + `OVERRIDE` 手工兜底表），被 `import_resources.py` 复用
 - `import_resources.py` — **主导入脚本**：扫描素材目录，把 音频MP3 → 作品、拓展音频 → 单元、PPT/教案 → 单元，拷贝到 `audio/` 与 `media/`，并生成上述三个 js
   - 用法：`python3 import_resources.py --dry`（只看对应关系与缺口）/ 去掉 `--dry` 实际执行
@@ -62,3 +69,57 @@
 
 ### 校徽 / 校名说明
 侧栏品牌区使用学校官方「校徽 + 校名」图（2026-09 由用户提供）。两张原图均为白底，页面将其放在白色圆角品牌牌中横排展示，深浅主题下都协调。
+
+## 补充资料区：老师怎么投稿
+
+纯静态网页本身**没有服务器，收不了文件**，所以投稿走「外部表单收集 + 本地回填」：
+
+```
+老师填腾讯问卷              →  我拉取回答         →  回填并发布
+（选单元+课次、选类型、传文件）    （MCP list_answers）   （ingest_supplement.py → supplementary.js → push）
+```
+
+### 1. 投稿表单（腾讯问卷）
+表单字段与「必需满足的两条要求」一一对应：
+
+| 题目 | 题型 | 对应要求 |
+|---|---|---|
+| 属于哪个单元、哪一课？ | **联动题**（选完单元自动过滤课次） | 要求 1：选择对应的单元和课程 |
+| 材料类型 | 单选题：音频 / 视频 / PPT·课件 / 文本·文档 | 要求 2：选择材料的类型 |
+| 资料名称 | 单行文本（必答） | — |
+| 上传资料文件 | **附件题** | — |
+| 文件太大？粘贴网盘链接 | 单行文本（选填） | — |
+| 补充说明 | 多行文本（选填） | — |
+| 投稿人 | 单行文本（选填） | — |
+
+表单定义由 `build_survey.py` 按 `data.js` 的真实单元/作品结构生成（19 个单元 / 107 行课程），
+避免手写错漏；生成后交给腾讯问卷 MCP 的 `create_survey` 创建，拿到投放链接。
+
+```bash
+python3 build_survey.py            # 生成 survey_text_linked.txt（联动题版）
+                                   # 与 survey_text_twodropdown.txt（兜底：两个独立下拉题）
+```
+
+### 2. 拉回答并回填
+
+```bash
+# 用腾讯问卷 MCP 的 list_answers 把回答存成 answers.json，然后：
+python3 ingest_supplement.py answers.json \
+    --submit-url https://wj.qq.com/s2/<id>/<hash> \
+    --dry-run                       # 先看解析结果，确认无误再去掉 --dry-run
+```
+
+可选参数：
+- `--only-approved` — 只收录 `approved.txt` 里列出的标题（**人工审核**后再发布）
+- `--links link_map.json` — 附件题只给了文件名时，用 `{标题: 分享链接}` 补上直链
+- `--tip "…"` — 自定义页面上投稿区的说明文案
+
+脚本会做类型归一、单元归属解析、链接合法性校验（只放行 `http(s)`）和转义，最后写出 `supplementary.js`。
+网页端 `supportCard()` 渲染时**对所有外部内容再转义一次**，并用 `supUrl()` 二次校验链接协议——投稿内容来自外部，按不可信内容处理。
+
+### 3. 页面上的呈现
+- 音频 → 「▶ 播放」，走页面底部统一的浮动播放条（与教材音频体验一致）
+- 视频 → 「▶ 播放 ↗」新窗口播放
+- PPT → 「下载 ↗」
+- 文本 → 「展开阅读」，正文直接在页面内展开
+- 无投稿的单元显示空态提示；投稿入口未开放时按钮显示「投稿入口尚未开放」，不会出现死链
