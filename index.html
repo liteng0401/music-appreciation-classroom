@@ -196,6 +196,16 @@ const D = window.COURSE_DATA;
 const $ = (s,el=document)=>el.querySelector(s);
 const crumb = $("#crumb");
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 课件 PPT 下载走 GitHub 加速镜像（2026-09-22 实测）
+// 学校网络打不开 github.com（Release 附件实测超时），但把原始链接拼在镜像域名后面
+// 就能国内直连下载：52 个附件实测全部可用、整文件 SHA-256 与源文件一致、支持断点续传，
+// 速度约 330 KB/s（22MB ≈ 72 秒）。
+// ⚠️ 这是第三方公共服务，不由我们控制，哪天限速或停掉都有可能。要换镜像 / 临时关掉，
+//    只改下面这一行即可：改成 "" 就退回 GitHub 原始直链（需要科学上网）。
+const DL_MIRROR = "https://ghproxy.net/";
+const mirror = u => (DL_MIRROR && /^https:\/\/github\.com\//i.test(u||"")) ? DL_MIRROR + u : (u||"");
+
 function groupName(g){return g==="序篇"?"序篇":g;}
 
 function buildNav(){
@@ -350,7 +360,8 @@ function showUnit(id){
     const fsize = n => !n ? "" : (n>=1048576 ? (n/1048576).toFixed(1)+" MB" : Math.max(1,Math.round(n/1024))+" KB");
     // PPT 的下载地址在 it.url（GitHub Release 附件）；it.path 只在本地打开网页时有效，
     // 线上是没有 media/ppt/ 这个目录的（2GB 超仓库上限，被 gitignore 了）——所以必须优先用 url。
-    const row = (it,ic) => `<div class="res-item"><span class="nm">${ic} ${esc(it.name)}</span><span class="sz">${fsize(it.size)}</span><a class="rbtn" href="${esc(it.url || it.path)}" target="_blank" rel="noopener" download>下载 ↗</a></div>`;
+    // mirror() 会把 github.com 的链接改写成国内可直连的加速镜像；教案走相对路径，不受影响。
+    const row = (it,ic) => `<div class="res-item"><span class="nm">${ic} ${esc(it.name)}</span><span class="sz">${fsize(it.size)}</span><a class="rbtn" href="${esc(mirror(it.url || it.path))}" target="_blank" rel="noopener" download>下载 ↗</a></div>`;
     let inner = "";
     if(R.ppt && R.ppt.length){
       inner += `<div class="res-sub">📊 课件 PPT · ${R.ppt.length} 个</div><div class="res-list">${R.ppt.map(x=>row(x,"▫")).join("")}</div>`;
@@ -360,7 +371,7 @@ function showUnit(id){
       }
     }
     if(R.jiaoan && R.jiaoan.length) inner += `<div class="res-sub">📄 教案 Word · ${R.jiaoan.length} 份</div><div class="res-list">${R.jiaoan.map(x=>row(x,"▫")).join("")}</div>`;
-    h += `<div class="card"><h3>📎 配套资源下载</h3>${inner}<div class="res-tip">PPT 有两条路：① <b>「本单元课件打包下载」走微云</b>——国内网络直接可用，一次拿全单元（推荐，只需登录微云）；② 下面逐个文件的链接走 GitHub 附件区，<b>需要科学上网</b>，附件名会变成「单元-序号」如 ch04-02.pptx，与上方条目顺序一一对应。教案 Word 在站内直接下载。文件较大，建议在电脑端下载。</div></div>`;
+    h += `<div class="card"><h3>📎 配套资源下载</h3>${inner}<div class="res-tip">PPT 有两条路，都<b>不用科学上网</b>：① <b>逐个文件的「下载 ↗」</b>走 GitHub 加速镜像，直接点就行（速度约 300KB/s，大文件请耐心等，支持断点续传）；② <b>「本单元课件打包下载」</b>走微云，一次拿全单元、速度更快，但<b>首次需要扫码登录微云</b>（微信/QQ 均可，一次即可）。某一条路临时不好使就换另一条。教案 Word 在站内直接下载，不受影响。文件都比较大，建议在电脑端下载。</div></div>`;
   }
   // 补充资料区（教师投稿）
   h += supportCard(u.id);
