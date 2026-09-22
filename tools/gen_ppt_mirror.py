@@ -66,11 +66,18 @@ def main():
                                              "pdir_key": info.get("pdir_key", "")}],
                               "share_name": "音乐鉴赏课件-%s" % uid}},
                 sid=sid)
-            d = res.get("structuredContent")
+            # 微云整个连接器按日限流：配额用尽时返回的是 {error:{code:-32603,...}}，
+            # 没有 result。这种情况**不要抛异常**，跳过该单元继续跑，
+            # 否则已经建好的链接会被这次失败连累、整个文件都写不出来。
+            if "result" not in res:
+                msg = json.dumps(res.get("error", res), ensure_ascii=False)[:200]
+                print("!! 拿不到分享 %s（跳过，保留其余）：%s" % (uid, msg))
+                continue
+            d = res["result"].get("structuredContent")
             if d is None:
                 d = json.loads(res["result"]["content"][0]["text"])
             if d.get("error"):
-                print("分享失败 %s: %s" % (uid, d["error"]))
+                print("!! 分享失败 %s：%s" % (uid, d["error"]))
                 continue
             url = d["short_url"]
             cache[uid] = {"file_id": info["file_id"], "url": url, "zip": fname}
