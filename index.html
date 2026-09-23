@@ -98,6 +98,18 @@
   .sup-toggle:hover{background:var(--brand2);color:#fff}
   /* 测验 */
   .quiz .q{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .qnote{font-size:13px;color:var(--muted);margin:-2px 0 8px;line-height:1.6}
+  .q .qtag{display:inline-block;font-size:12px;font-weight:400;color:var(--brand2);background:var(--chip);border-radius:6px;padding:2px 7px;margin-right:8px;vertical-align:1px}
+  .qaplay{display:inline-block;margin:0 0 8px;font-size:13px;padding:6px 12px;border:0;border-radius:8px;background:var(--brand2);color:#fff;cursor:pointer}
+  .exam-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  .exam-timer{font-variant-numeric:tabular-nums;font-weight:600;font-size:20px;color:var(--brand2)}
+  .exam-timer.warn{color:var(--bad)}
+  .exam-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .exam-grid button{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer;font-size:13px;color:var(--ink)}
+  .exam-grid button.done{background:var(--chip);border-color:var(--brand2)}
+  .exam-grid button.right{background:#e8f6ee;border-color:var(--ok)}
+  .exam-grid button.wrong{background:#fce9e7;border-color:var(--bad)}
+  .exam-result{font-size:15px;line-height:1.9}
   .q .qt{font-weight:600;margin-bottom:10px}
   .opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer;color:var(--ink);font-size:15px}
   .opt:hover{border-color:var(--brand2)}
@@ -162,6 +174,7 @@
       <button onclick="showView('home')">🏠 总览</button>
       <button onclick="showView('gloss')">🔤 术语速查</button>
       <button onclick="showView('cheat')">📊 对比速查</button>
+      <button onclick="showView('exam')">🎯 学考模拟</button>
     </div>
     <div id="nav"></div>
     <div class="tools"><button id="themeBtn">🌓 切换深色</button></div>
@@ -197,6 +210,7 @@
 <script src="audio_extra.js"></script>
 <script src="resources.js"></script>
 <script src="ppt_mirror.js"></script>
+<script src="exam_bank.js"></script>
 <script src="supplementary.js"></script>
 <script>
 const D = window.COURSE_DATA;
@@ -388,24 +402,35 @@ function showUnit(id){
   if(u.takeaways.length){
     h += `<div class="card"><h3>✅ 学习要点</h3><ol class="clean">${u.takeaways.map(t=>`<li>${esc(t)}</li>`).join("")}</ol></div>`;
   }
-  // 测验
-  h += `<div class="card quiz"><h3>✏️ 随堂练习（${u.quiz.length} 题）</h3>
+  // 测验：优先用学考风格题库（EXAM_BANK），没覆盖到才回退到教材随堂题
+  const QB = bankOf(u);
+  const nAudio = QB.filter(q=>q.audio).length;
+  h += `<div class="card quiz"><h3>✏️ 随堂练习（${QB.length} 题${nAudio?` · 含 ${nAudio} 道听辨`:""}）</h3>
+        <div class="qnote">题型对齐河北省音乐学考理论知识部分（省统一机考、<b>只有选择题</b>）：四选一，单项选择。${nAudio?"带 🔊 的题目请<b>先听音频再作答</b>。":""}</div>
         <div class="progress"><i id="bar"></i></div>
-        <div class="score" id="score">已完成 0 / ${u.quiz.length}</div>
+        <div class="score" id="score">已完成 0 / ${QB.length}</div>
         <div id="qlist"></div>
         <div id="quizDone" class="hidden" style="margin-top:10px;font-weight:700;color:var(--brand2)"></div>
         </div>`;
   $("#content").innerHTML = h;
-  renderQuiz(u);
+  renderQuiz(QB);
   window.scrollTo(0,0);
 }
 
-function renderQuiz(u){
+// 题库选择：EXAM_BANK 覆盖该单元就用它，否则退回教材自带的随堂题
+function bankOf(u){
+  const B = window.EXAM_BANK && window.EXAM_BANK.units && window.EXAM_BANK.units[u.id];
+  return (B && B.length) ? B : u.quiz;
+}
+
+function renderQuiz(QB){
   const box = $("#qlist"); box.innerHTML=""; answered=new Set();
-  u.quiz.forEach((q,i)=>{
+  QB.forEach((q,i)=>{
     const qd=document.createElement("div"); qd.className="q"; qd.dataset.i=i;
     let opts = q.options.map((o,j)=>`<button class="opt" data-j="${j}" onclick="sel(${i},${j})">${esc(o)}</button>`).join("");
-    qd.innerHTML = `<div class="qt">${i+1}. ${esc(q.q)}</div>${opts}
+    const tag = q.tag ? `<span class="qtag">${esc(q.tag)}</span>` : "";
+    const au = q.audio ? `<button class="qaplay" onclick="playSrc('${esc(q.audio)}','听辨音频',this)">🔊 播放音频</button>` : "";
+    qd.innerHTML = `<div class="qt">${i+1}. ${tag}${esc(q.q)}</div>${au}${opts}
       <div class="ex" id="ex${i}">💡 ${esc(q.explain)}</div>
       <div class="qbtns"><button class="submit" onclick="grade(${i},${q.answer})">提交</button>
       <button class="next" onclick="nextQ(${i})">下一题 ↓</button></div>`;
@@ -453,7 +478,7 @@ function updateScore(){
 function showView(v){
   if(v==="home"){ crumb.textContent="总览";
     $("#content").innerHTML = `<div class="uhead"><h2>欢迎使用《音乐鉴赏》互动课堂</h2></div>
-      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念。右下角 📝 便签可随手记录校本补充。每单元底部的 <b>🗂 补充资料区</b> 收纳老师们自己投稿的音频、视频、PPT 与文字资料——点「＋ 提交补充材料」即可投稿。</div>
+      <div class="card core"><h3>怎么用</h3>左侧按「序篇 / 上篇 / 下篇」选择单元，每单元含 <b>重点知识讲解</b>、<b>作品鉴赏</b>、<b>聆听示范</b> 与 <b>随堂练习</b>。练习提交后即时显示对错与解析，进度条在顶部。右上「术语速查 / 对比速查」可快速查阅全书概念，<b>「🎯 学考模拟」</b>按河北省音乐学考理论知识部分的形式组卷（25 题 / 20 分钟 / 50 分 / 60% 合格）。右下角 📝 便签可随手记录校本补充。每单元底部的 <b>🗂 补充资料区</b> 收纳老师们自己投稿的音频、视频、PPT 与文字资料——点「＋ 提交补充材料」即可投稿。</div>
       <div class="card"><h3>📚 全书结构</h3><ul class="clean">
       ${D.units.map(u=>`<li><a href="#" onclick="showUnit('${u.id}')" style="color:var(--brand2)">${esc(u.title.replace(/（.*$/,'') )}</a></li>`).join("")}
       </ul></div>`;
@@ -473,7 +498,179 @@ function showView(v){
   if(v==="cheat"){
     crumb.textContent="对比速查";
     $("#content").innerHTML=`<div class="card"><h3>📊 对比速查表</h3>${D.cheatsheet}</div>`;
+    return;
   }
+  if(v==="exam"){
+    crumb.textContent="学考模拟";
+    if(exTimer){ clearInterval(exTimer); exTimer=null; }
+    $("#content").innerHTML=`<div class="card">
+      <h3>🎯 学考模拟（理论知识部分）</h3>
+      <div class="exam-result">
+        <p>按河北省普通高中学业水平合格性考试（音乐）<b>理论知识部分</b>的形式组卷：
+        <b>省统一命题、计算机考试、全部为四选一选择题</b>，考试时长 <b>20 分钟</b>，
+        理论知识满分 <b>50 分</b>，<b>60% 以上（30 分）为合格</b>；
+        考查范围为人音版《音乐鉴赏》必修。</p>
+        <p style="color:var(--muted)">题库依据公开的考试形式与教材内容自建，每题都可回溯到教材条目；
+        <b>河北省不公开音乐学考真题</b>，本模拟卷不代表历年真题。</p>
+      </div>
+      <div class="qbtns" style="margin-top:14px">
+        <button class="submit" onclick="startExam()">开始模拟（25 题 · 20 分钟 · 50 分）</button>
+      </div>
+      <div id="examBox"></div>
+    </div>`;
+    return;
+  }
+}
+
+/* ───────────────────────── 学考模拟 ─────────────────────────
+   依据：河北省音乐学考理论知识部分 = 省统一命题机考、只有选择题、20 分钟、满分 50 分、
+   60% 合格。所以模拟卷固定 25 题 × 2 分 = 50 分，倒计时 20 分钟，到点自动交卷。 */
+const EXAM_N=25, EXAM_MIN=20, EXAM_PER=2, EXAM_PASS=0.6;
+let exQs=[], exAns={}, exTimer=null, exLeft=0, exOver=false;
+
+function examShuffle(a){
+  a=a.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+// 组卷：先保证「每个单元各来一题」，再补足题量。
+// 机考会放音频，所以听辨题预留固定配额（太多会变成听力专卷，太少又不模拟机考）。
+const EXAM_AUDIO = 5;
+function examBuild(n){
+  const B=(window.EXAM_BANK&&window.EXAM_BANK.units)||{};
+  const ids=Object.keys(B).filter(id=>B[id]&&B[id].length);
+  if(!ids.length) return [];
+  const pools={}; ids.forEach(id=>pools[id]=examShuffle(B[id]));
+  const taken=new Set(), paper=[];
+  let audioLeft=Math.min(EXAM_AUDIO, n);
+
+  // 第一轮：每单元 1 题，优先取该单元的听辨题（额度用完就优先取非听辨题）
+  for(const id of examShuffle(ids)){
+    if(paper.length>=n) break;
+    const arr=pools[id];
+    const wantAudio = audioLeft>0;
+    let pick=-1;
+    for(let i=0;i<arr.length;i++){ const q=arr[i]; if(!taken.has(q) && !!q.audio===wantAudio){ pick=i; break; } }
+    if(pick<0) for(let i=0;i<arr.length;i++){ if(!taken.has(arr[i])){ pick=i; break; } }
+    if(pick<0) continue;
+    if(arr[pick].audio) audioLeft--;
+    taken.add(arr[pick]); paper.push(arr[pick]);
+  }
+
+  // 第二轮：剩余名额随机补（仍然每次换一个单元开头，避免集中在题库大的单元）
+  const draw=pred=>{
+    for(const id of examShuffle(ids)){
+      const arr=pools[id];
+      for(let i=0;i<arr.length;i++){
+        const q=arr[i];
+        if(taken.has(q)) continue;
+        if(pred && !pred(q)) continue;
+        taken.add(q); return q;
+      }
+    }
+    return null;
+  };
+  while(paper.length<n){ const q=draw(null); if(!q) break; paper.push(q); }
+  return examShuffle(paper);
+}
+
+function startExam(){
+  exQs=examBuild(EXAM_N); exAns={}; exOver=false;
+  if(exTimer){ clearInterval(exTimer); exTimer=null; }
+  if(!exQs.length){ $("#examBox").innerHTML='<div class="card">题库为空，请先运行 tools/gen_exam_bank.py 生成 exam_bank.js。</div>'; return; }
+  exLeft=EXAM_MIN*60;
+  const full=exQs.length*EXAM_PER, line=Math.round(full*EXAM_PASS);
+  $("#examBox").innerHTML=`
+    <div class="card">
+      <div class="exam-head">
+        <div>共 <b>${exQs.length}</b> 题 · 每题 ${EXAM_PER} 分 · 满分 <b>${full}</b> 分 · 合格线 <b>${line}</b> 分</div>
+        <div class="exam-timer" id="exTimer">20:00</div>
+      </div>
+      <div class="exam-grid" id="exGrid"></div>
+      <div class="qbtns" style="margin-top:12px">
+        <button class="submit" id="exSubmitBtn" onclick="examSubmit(false)">交卷</button>
+      </div>
+    </div>
+    <div id="exList">${exQs.map((q,i)=>{
+      const opts=q.options.map((o,j)=>`<button class="opt" data-j="${j}" onclick="exPick(${i},${j})">${esc(o)}</button>`).join("");
+      const tag=q.tag?`<span class="qtag">${esc(q.tag)}${q.sec?" · "+esc(q.sec):""}</span>`:"";
+      const au=q.audio?`<button class="qaplay" onclick="playSrc('${esc(q.audio)}','听辨音频',this)">🔊 播放音频</button>`:"";
+      return `<div class="card quiz" id="exq${i}"><div class="q"><div class="qt">${i+1}. ${tag}${esc(q.q)}</div>${au}${opts}</div></div>`;
+    }).join("")}</div>`;
+  examGrid();
+  examPaint();
+  exTimer=setInterval(examTick,1000);
+}
+
+function examPaint(){
+  const t=$("#exTimer"); if(!t) return;
+  const left=Math.max(exLeft,0);
+  t.textContent=`${String(Math.floor(left/60)).padStart(2,"0")}:${String(left%60).padStart(2,"0")}`;
+  t.classList.toggle("warn", left<=180);
+}
+
+function examGrid(){
+  const g=$("#exGrid"); if(!g) return;
+  g.innerHTML=exQs.map((q,i)=>`<button type="button" data-i="${i}" class="${exAns[i]!=null?'done':''}" onclick="exJump(${i})">${i+1}</button>`).join("");
+}
+
+function exPick(i,j){
+  if(exOver) return;
+  exAns[i]=j;
+  const qd=$(`#exq${i} .q`);
+  qd.querySelectorAll(".opt").forEach(o=>o.classList.remove("sel"));
+  qd.querySelector(`.opt[data-j="${j}"]`).classList.add("sel");
+  examGrid();
+}
+
+function exJump(i){
+  const el=$(`#exq${i}`);
+  if(el) el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function examTick(){
+  exLeft--;
+  examPaint();
+  if(exLeft<=0) examSubmit(true);
+}
+
+function examSubmit(auto){
+  if(exOver) return;
+  exOver=true;
+  if(exTimer){ clearInterval(exTimer); exTimer=null; }
+  let right=0; const wrong=[];
+  exQs.forEach((q,i)=>{
+    const mine = exAns[i];
+    const ok = mine===q.answer;
+    if(ok) right++; else wrong.push(i);
+    const qd=$(`#exq${i} .q`);
+    if(!qd) return;
+    qd.querySelectorAll(".opt").forEach(o=>{
+      o.onclick=null;
+      const j=+o.dataset.j;
+      if(j===q.answer) o.classList.add("right");
+      else if(j===mine) o.classList.add("wrong");
+    });
+    const tip=document.createElement("div");
+    tip.className="ex show";
+    tip.innerHTML=`💡 ${esc(q.explain)}<div style="margin-top:6px;color:var(--muted);font-size:13px">正确答案：${esc(q.options[q.answer])}${mine!=null?` ｜ 你的选择：${esc(q.options[mine])}`:" ｜ 未作答"}</div>`;
+    qd.appendChild(tip);
+    const gb=$(`#exGrid button[data-i="${i}"]`);
+    if(gb){ gb.classList.remove("done"); gb.classList.add(ok?"right":"wrong"); }
+  });
+  const total=exQs.length*EXAM_PER, score=right*EXAM_PER, line=Math.round(total*EXAM_PASS);
+  const pass=score>=line;
+  const head=$(".exam-head");
+  if(head) head.innerHTML=`<div>已交卷${auto?"（时间到，自动交卷）":""} · 正确 <b>${right}</b> / ${exQs.length} 题</div><div class="exam-timer">${score} / ${total} 分</div>`;
+  const btn=$("#exSubmitBtn");
+  if(btn) btn.outerHTML='<button class="submit" onclick="startExam()">再来一套</button>';
+  $("#examBox").insertAdjacentHTML("afterbegin",`<div class="card exam-result">
+      <h3>${pass?"✅ 合格":"⚠️ 未达合格线"}</h3>
+      <div>得分 <b>${score}</b> / ${total} 分（合格线 ${line} 分，即 60%）· 正确率 ${Math.round(right/exQs.length*100)}%</div>
+      <div style="margin-top:8px;color:var(--muted);font-size:13px">${wrong.length?"错题已标红、解析展开在每题下方；点上方题号可快速跳转。":"全对，很稳。"}</div>
+    </div>`);
+  exJump(wrong.length?wrong[0]:0);
 }
 
 // ── 目录（侧栏）开关 ──────────────────────────────────────────────────────────
