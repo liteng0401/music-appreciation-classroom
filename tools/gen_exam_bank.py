@@ -549,6 +549,13 @@ def build():
             term = c["term"]
             if not cue or len(cue) < 10 or term in cue:
                 continue
+            # 「见 Frameworks（书第161页）。」这类**指针**不是释义：直接当题干会出现
+            # 「「见 Frameworks」描述的是下列哪一音乐概念？」——学生完全看不懂在问什么。
+            # （2026-10-16 全库复审时在 ch14/ch15/ch16 抓到 4 道，根因是知识库
+            #  chapters/*.md 的 Key Concepts 里那 4 条只写了一句指向 Frameworks 的指针。
+            #  已补全释义，这里再加一道守卫，防止以后又有人留指针。）
+            if re.match(r"^(见|参见|详见|同上|如上|如前)", cue):
+                continue
             # 「叶旭全、蒋开儒词，王佑贵曲」这类纯署名条目当题干没有考查意义，跳过
             if "《" not in cue and len(cue) <= 26 and cue.endswith(("曲", "词", "词曲")):
                 continue
@@ -605,9 +612,14 @@ def validate(bank):
             a = q["q"]
             if not a or not a.endswith(("？", "?")):
                 errs.append("%s 题干没以问号结尾" % where)
-            # 占位符/模板残留：教材原文里本来就有〔奥〕、[德] 这类写法，不能误伤，所以只查这些
-            for bad in ("mistake", "None", "undefined", "NaN", "%s", "{", "}", "TODO"):
-                if bad in a or any(bad in str(o) for o in opts):
+            # 占位符/模板残留：教材原文里本来就有〔奥〕、[德] 这类写法，不能误伤，所以只查这些。
+            # ⚠️ 「Frameworks」必须在这一列里：知识库章节文件用 `## Frameworks Introduced`
+            #    装完整释义、用 `## Key Concepts` 装精简释义，某条只写「见 Frameworks」当指针时，
+            #    题干/解析会原样带上这个英文词（2026-10-16 抓到 4 道）。**explain 也要查** ——
+            #    当时解析写的是「标题音乐与非标题音乐 — 见 Frameworks」，只查题干/选项会漏掉。
+            for bad in ("mistake", "None", "undefined", "NaN", "%s", "{", "}", "TODO",
+                        "Frameworks", "见上", "如前文"):
+                if bad in a or bad in (q.get("explain") or "") or any(bad in str(o) for o in opts):
                     errs.append("%s 含占位/异常字符 %r" % (where, bad))
             # 泄漏检查：正确答案的文本不应原样出现在题干里
             if opts and opts[q["answer"]] in a:

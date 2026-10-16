@@ -286,6 +286,31 @@ for u in units:
 def _norm(s):
     return re.sub(r"\s+", "", str(s or ""))
 
+# 占位符 / 字段名泄漏 / 指针式释义。
+#
+# ⚠️ 这一类问题是**最阴的**：页面照常渲染、照样判分、自检也全绿，
+#    只有逐条读数据才看得出来。历史上栽过两次：
+#      · 2026-09-22：38 道判断题题干字面是「判断：「mistake」是鉴赏时的正确做法。」
+#        （生成器把 dict 当元组解包，静默取到了键名）；
+#      · 2026-10-16：ch16 的 6 道随堂题选项里混进「见 Frameworks（书第179页）。」，
+#        其中 1 道**正确答案本身就是这句占位符**（根因：知识库
+#        `chapters/*.md` 的 Key Concepts 里那 4 条只写了指向 Frameworks 的指针，
+#        被当成释义直接用了）。
+#    所以这里对 **题干 / 每个选项 / 解析** 三处都扫一遍。
+_PLACEHOLDER = re.compile(
+    r"Frameworks|mistake|\bwhy\b|\bdetail\b|\bterm\b|\btakeaways\b|"
+    r"undefined|\bNone\b|\bNaN\b|TODO|XXX|占位|待补|\blorem\b|"
+    r"^\s*(见|参见|详见|同上|如上|如前)",
+    re.I,
+)
+
+def _texts_of(q):
+    """把一道题里所有会给学生看的文本摊平成 (位置名, 文本) 列表。"""
+    out = [("题干", q.get("q", "")), ("解析", q.get("explain", ""))]
+    for j, o in enumerate(q.get("options") or []):
+        out.append((f"选项{j}", o))
+    return out
+
 def audit_quizzes(units):
     problems = []
     for u in units:
@@ -304,6 +329,12 @@ def audit_quizzes(units):
                 problems.append(f"{u['id']} 第{i+1}题答案越界")
             if not q.get("explain"):
                 problems.append(f"{u['id']} 第{i+1}题缺解析")
+            for where, text in _texts_of(q):
+                hit = _PLACEHOLDER.search(str(text or ""))
+                if hit:
+                    problems.append(
+                        f"{u['id']} 第{i+1}题 {where} 含占位符/指针 {hit.group(0)!r}: {str(text)[:50]}"
+                    )
     # 跨单元
     g = {}
     for u in units:
@@ -314,13 +345,33 @@ def audit_quizzes(units):
             problems.append(f"跨单元题干重复: {'/'.join(ids)} | {k}")
     return problems
 
-_problems = audit_quizzes(units)
+def audit_concepts(units):
+    """术语/框架的释义也要扫占位符。
+
+    这一条是 2026-10-16 那次的直接教训：坏的不是题目本身，而是**释义写成了指针**，
+    然后被题目生成器拿去当素材了。所以源头也要拦。
+    """
+    problems = []
+    for u in units:
+        for kind in ("concepts", "frameworks"):
+            for c in (u.get(kind) or []):
+                t = c.get("term", "")
+                for field in ("def", "detail"):
+                    hit = _PLACEHOLDER.search(str(c.get(field, "") or ""))
+                    if hit:
+                        problems.append(
+                            f"{u['id']} {kind}[{t}] 的 {field} 含占位符/指针 "
+                            f"{hit.group(0)!r}: {str(c.get(field))[:50]}"
+                        )
+    return problems
+
+_problems = audit_quizzes(units) + audit_concepts(units)
 if _problems:
-    print("!! 习题自检发现问题:")
+    print("!! 数据自检发现问题:")
     for p in _problems:
         print("   -", p)
 else:
-    print("习题自检: 通过（无重复题干 / 无重复选项 / 答案与解析齐全）")
+    print("习题自检: 通过（无重复题干 / 无重复选项 / 答案与解析齐全 / 无占位符指针）")
 
 _judge_dist = {}
 for u in units:
